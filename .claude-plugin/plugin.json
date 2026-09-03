@@ -1,0 +1,9 @@
+{
+  "name": "spec-first",
+  "version": "1.0.0",
+  "description": "Spec-first workflow: the project owner sets intent and acceptance criteria, Claude owns implementation end-to-end with a harsh internal critic until criteria pass.",
+  "author": {
+    "name": "Arthur Lorin",
+    "url": "https://github.com/Singeon0"
+  }
+}

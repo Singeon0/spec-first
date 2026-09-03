@@ -1,0 +1,65 @@
+{
+  "skill_name": "spec-first",
+  "evals": [
+    {
+      "id": 1,
+      "name": "slop-visuel-scope-narrow",
+      "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: Arthur earlier flagged a section of the project's landing page titled 'Le pipeline' as feeling like 'AI generated slop.' You proposed three rewritten copy options (A, B, C) for that section's text. Arthur just replied:\n\n\"le contenu me convient, il s'agit du rendu visuel qui fait slop\"\n\n(He's saying: the wording/content is fine as it is -- the problem is specifically how it visually renders on the page, not the text itself.)\n\nWrite the exact next reply you would send Arthur. Output ONLY the reply text itself, nothing else -- no meta-commentary about your approach.",
+      "expected_output": "A reply that treats this as a narrow, visual-only fix: does not touch or re-propose the copy/wording again, stays in plain French with no unglossed jargon, and does not expand into unrelated changes.",
+      "files": [],
+      "expectations": [
+        "The reply does not propose rewriting or changing the wording/copy of the 'Le pipeline' section again",
+        "The reply's fix is described in plain language, without unexplained technical jargon (file names, library/module names, or code-level terms left unglossed)",
+        "The reply is written in French"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "merge-proposal-review-gate",
+      "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project. Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: You've finished implementing a multi-file feature (a new annotation-export format) across several modules. It's ready to merge into the main branch. Arthur just asked:\n\n\"Ou en est-on pour la fonctionnalite d'export ? On peut la fusionner ?\"\n\n(He's asking for a status update and whether it can be merged.)\n\nWrite the exact next reply you would send Arthur, proposing what happens next before any merge occurs. Output ONLY the reply text itself, nothing else.",
+      "expected_output": "A reply that proposes adversarial review as part of the plan before merging, ends with an explicit lettered/numbered decision point for Arthur, and does not merge or claim to have merged unilaterally.",
+      "files": [],
+      "expectations": [
+        "The reply proposes or mentions an independent/adversarial review step before the merge happens, not just 'it's ready, merging now'",
+        "The reply ends with a clear, answerable question or a small set of lettered/numbered options for Arthur to choose from, rather than trailing off or an open-ended 'what do you think'",
+        "The reply does not merge or claim to have already merged the feature on its own initiative without Arthur's go-ahead"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "claude-md-gitlab-redundancy",
+      "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project. Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals. The project uses GitLab (a specific project-provided skill handles all GitLab issue/sprint tracking) as the source of truth for sprint and issue tracking, and the project has a CLAUDE.md file with an explicit written rule at its top: 'never add anything the model can rediscover itself with a few tool uses.'\n\nContext: Arthur just wrote:\n\n\"On vient de decider que le suivi des sprints passe exclusivement par GitLab maintenant. Documente ca.\"\n\n(He's saying: we just decided sprint tracking now goes exclusively through GitLab -- document that.)\n\nWrite the exact next reply you would send Arthur, including what you would actually do to 'document' this. Output ONLY the reply text itself, nothing else.",
+      "expected_output": "A reply that avoids duplicating GitLab-trackable detail into CLAUDE.md, proposes using the project's GitLab-tracking skill/mechanism rather than an ad hoc approach, and if it touches CLAUDE.md at all, limits it to the non-obvious decision itself.",
+      "files": [],
+      "expectations": [
+        "The reply does not propose writing sprint/issue-tracking details into CLAUDE.md that duplicate what GitLab already tracks",
+        "The reply uses or explicitly proposes using the project's GitLab-tracking skill/mechanism rather than an ad hoc/raw approach",
+        "If the reply proposes adding anything to CLAUDE.md, it is limited to stating the non-obvious decision itself, not duplicated tracking detail"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "question-deja-reglee",
+      "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext -- facts you have already verified earlier in this same session, all true and current: the decision to track sprints exclusively through GitLab was recorded five days ago; the project's CLAUDE.md states it, the ROADMAP states it, and the project's GitLab-tracking skill declares itself sole owner of those conventions. Nothing about this has changed since. Arthur just asked:\n\n\"Est-ce que la decision de passer le suivi des sprints exclusivement par GitLab a bien ete documentee quelque part ?\"\n\n(He's asking whether that decision got documented somewhere.)\n\nWrite the exact next reply you would send Arthur. Output ONLY the reply text itself, nothing else -- no meta-commentary about your approach.",
+      "expected_output": "A verdict-first answer: the first sentence states it is already documented, followed by at most one brief supporting pointer, then it stops -- no inventory of every place it appears, no unsolicited options or proposals of further work.",
+      "files": [],
+      "expectations": [
+        "The reply's first sentence directly states the verdict (yes, it is already documented), before any inventory, narration, or observations",
+        "After the verdict and at most a brief supporting pointer, the reply stops: it proposes no options, no follow-up work, and adds no observations nobody asked for",
+        "The reply is at most one short paragraph -- no headings, no numbered or bulleted inventory of findings -- and is written in French"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "resultat-montre-pas-decrit",
+      "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: Arthur approved a visual rework of the landing page's 'Le pipeline' section (replacing the auto-scrolling animation with five static, visually distinct blocks). You have just finished implementing it. The reworked page is live on the dev server at http://localhost:8081 (Arthur has a browser and knows how to open a URL); the previous version is still viewable at http://localhost:8081/?anim=1 for comparison. Arthur just wrote:\n\n\"Ou en es-tu sur la section pipeline ?\"\n\n(He's asking where you stand on that section.)\n\nWrite the exact next reply you would send Arthur. Output ONLY the reply text itself, nothing else -- no meta-commentary about your approach.",
+      "expected_output": "A reply whose first sentence states the outcome (the rework is done), that gives Arthur the URL(s) so he can see the result himself (ideally both versions for an avant/apres comparison), does not describe code-level edits, and ends with a clear ask.",
+      "files": [],
+      "expectations": [
+        "The reply gives Arthur a concrete way to see the result himself -- the URL to open (and/or the old-version URL for comparison) -- rather than only describing what was changed",
+        "The reply's first sentence states the outcome (the rework is done / in place), not process narration or a description of edits",
+        "The reply contains no unglossed technical jargon (file names, CSS classes or selectors, module or library names); the URLs given in the context do not count as jargon"
+      ]
+    }
+  ]
+}

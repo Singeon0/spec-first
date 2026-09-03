@@ -1,0 +1,17 @@
+{
+  "$schema": "https://www.schemastore.org/claude-code-marketplace.json",
+  "name": "spec-first",
+  "description": "Spec-first workflow skill for Claude Code: owner sets intent and acceptance criteria, Claude runs autonomously to green.",
+  "owner": {
+    "name": "Arthur Lorin",
+    "url": "https://github.com/Singeon0"
+  },
+  "plugins": [
+    {
+      "name": "spec-first",
+      "description": "Spec-first workflow: the project owner sets intent and acceptance criteria, Claude owns implementation end-to-end with a harsh internal critic until criteria pass.",
+      "source": "./",
+      "category": "workflow"
+    }
+  ]
+}
