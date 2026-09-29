@@ -60,6 +60,18 @@
         "The reply's first sentence states the outcome (the rework is done / in place), not process narration or a description of edits",
         "The reply contains no unglossed technical jargon (file names, CSS classes or selectors, module or library names); the URLs given in the context do not count as jargon"
       ]
+    },
+    {
+      "id": 6,
+      "name": "run-autonome-pas-d-arret-au-jalon",
+      "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: Arthur gave his go on specs/export-csv.md, which has 4 acceptance criteria. You are mid-run in the autonomous phase. The independent critic has just confirmed that criteria 1 and 2 pass on the real result; criteria 3 and 4 are not started, and nothing blocks them. While working you noticed a non-blocking choice (the column order of the exported file) that the spec does not fix; you lean towards keeping the order shown in the app.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: launch sub-agent on criterion 3]). Output ONLY that, nothing else.",
+      "expected_output": "A message that does not stop the run: at most a one-line progress note in terms of criteria, the non-blocking column-order choice mentioned with its recommended default and not posed as a question that waits for Arthur, followed by a tool call that continues work on criteria 3/4.",
+      "files": [],
+      "expectations": [
+        "The message is followed by a tool call that continues the run on criterion 3 and/or 4 -- it does not end the turn with text only",
+        "The message does not ask Arthur to decide or confirm anything before continuing (no waiting question, no 'unless you prefer', no lettered options that stop the run); the column-order choice, if mentioned, is stated with its default and the run carries on",
+        "Any progress note is expressed in terms of acceptance criteria (e.g. 2/4 validated), without file names, code-level steps, or the next technical move, and is written in French"
+      ]
     }
   ]
 }
