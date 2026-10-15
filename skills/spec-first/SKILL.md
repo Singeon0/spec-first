@@ -14,6 +14,7 @@ disable-model-invocation: true
 allowed-tools:
   - Workflow(spec-first:run)
   - Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/keep-waiting.sh" *)
+  - Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/repo-state.sh" *)
 ---
 
 # Spec-first — he owns the what, you own the how
@@ -200,14 +201,12 @@ the cheapest one that does the job well.
 
 | Role | Model | Why |
 |---|---|---|
-| Scout: files per criterion, repo state, test command | Haiku medium | Mechanical; fast and almost free |
 | Developer | Opus medium, then high, then xhigh | One tier up after each rejection by the critics |
-| Critics: a panel of three | Opus xhigh | Must find what the author missed |
+| Critics: a panel of three | Opus, one tier above the developer: high, then xhigh | Sharper than the author, without overspending on easy criteria |
 | Fusion of work done in parallel | Opus high | Conflicts need judgment, not depth |
-| Final check on the integrated result | Opus xhigh | Same panel, on everything at once |
+| Final check on the integrated result | Opus, one tier above the highest developer effort | Same panel, on everything at once |
 
-Never Opus max (his call alone), never Haiku above medium in this run,
-never Fable.
+Never Opus max (his call alone), never Fable.
 
 The three critics judge each criterion without seeing each other:
 - **testeur** — runs the real result and tries to break the criterion;
@@ -219,12 +218,17 @@ The three critics judge each criterion without seeing each other:
 A criterion passes only when the tester verified it on the real result
 and no critic proved a defect. A defect without a reproduction is not one.
 
-**How.** Right after his go, with the criteria numbered in the spec, call
-`Workflow({name: "spec-first:run", args: {specPath, projectRoot,
-criteria: [{id, text}]}})` with absolute paths. It groups criteria that
-touch the same files, runs independent groups in parallel in isolated
-copies when the repository is clean, merges them, then runs the final
-check. It runs in the background: hold your turn (§4) until it returns.
+**How.** Right after his go, with the criteria numbered in the spec, run
+`bash "${CLAUDE_PLUGIN_ROOT}/scripts/repo-state.sh" <projectRoot>
+<your primary working directory>`, then call `Workflow({name:
+"spec-first:run", args: {specPath, projectRoot, criteria: [{id, text}],
+repo, groups, testCommand}})` with absolute paths: `repo` is the script's
+JSON output, verbatim; `groups` lists every criterion id once, criteria
+that may touch the same files in the same group — you know the code from
+writing the spec; omit it and one developer takes them all;
+`testCommand` runs the project tests from its root, omit it if none. The
+workflow runs independent groups in parallel in isolated copies when the
+repository is clean, merges them, then runs the final check. It runs in the background: hold your turn (§4) until it returns.
 Then:
 - tick each « validé » criterion in the spec, add « Décisions prises
   pendant le run », and deliver the result (§2);
@@ -234,7 +238,7 @@ Then:
 - problems outside the scope: one line each, offered as options (Always).
 
 A one-sentence spec (small reversible task, §3) skips the workflow: one
-Opus medium sub-agent does it, one Opus xhigh tester checks it. If the
+Opus medium sub-agent does it, one Opus high tester checks it. If the
 Workflow tool is unavailable or fails, run the same roles with the Agent
 tool, same models and efforts, the three critics launched in one message.
 

@@ -1,22 +1,21 @@
 export const meta = {
   name: 'run',
-  description: 'spec-first autonomous run: scout, one developer per group of independent criteria, three-critic panel with effort escalation, fusion, final check of every criterion',
-  whenToUse: 'Called by the spec-first skill after the owner gave his go on a spec. args: { specPath, projectRoot, criteria: [{ id, text }] } with absolute paths. Not for a bare slash-command call without args: tell the user to run /spec-first instead.',
+  description: 'spec-first autonomous run: one developer per group of independent criteria, three-critic panel one effort tier above the developer, effort escalation, fusion, final check of every criterion',
+  whenToUse: 'Called by the spec-first skill after the owner gave his go on a spec. args: { specPath, projectRoot, criteria: [{ id, text }], repo: <JSON printed by scripts/repo-state.sh>, groups?: [[ids]], testCommand? } with absolute paths. Not for a bare slash-command call without args: tell the user to run /spec-first instead.',
   phases: [
-    { title: 'Repérage', detail: 'haiku medium: files per criterion, repository state, test command' },
     { title: 'Développement', detail: 'opus, one developer per group of criteria; medium, then high, then xhigh after each rejection' },
-    { title: 'Critique', detail: 'opus xhigh: tester, owner and maintainer judge each criterion blind to each other' },
+    { title: 'Critique', detail: 'opus, one tier above the developer (high, then xhigh): tester, owner and maintainer judge each criterion blind to each other' },
     { title: 'Fusion', detail: 'opus high: integrates the isolated groups into the project tree' },
-    { title: 'Contrôle final', detail: 'opus xhigh: the panel re-checks every criterion on the integrated result' },
+    { title: 'Contrôle final', detail: 'opus, one tier above the highest developer effort: the panel re-checks every criterion on the integrated result' },
   ],
 }
 
 // ---------------------------------------------------------------- models
 // One role, one model. Opus max is never used here: it is the owner's call.
-const SCOUT = { model: 'haiku', effort: 'medium' }
-const SCOUT_FALLBACK = { model: 'opus', effort: 'medium' }
 const DEV_EFFORTS = ['medium', 'high', 'xhigh'] // one tier up after each rejection
-const CRITIC = { model: 'opus', effort: 'xhigh' }
+// Critics run one tier above the developer they judge: medium → high, high and xhigh → xhigh.
+const TIERS = ['low', 'medium', 'high', 'xhigh']
+const criticEffort = devEffort => TIERS[Math.min(TIERS.indexOf(devEffort) + 1, TIERS.length - 1)]
 const FUSION = { model: 'opus', effort: 'high' }
 const REPAIR = { model: 'opus', effort: 'xhigh' }
 
@@ -34,39 +33,39 @@ const CRITERIA = input.criteria.map((c, i) =>
   typeof c === 'string' ? { id: String(i + 1), text: c } : { id: String(c.id != null ? c.id : i + 1), text: String(c.text || '') })
 const byId = Object.fromEntries(CRITERIA.map(c => [c.id, c]))
 
-// ---------------------------------------------------------------- schemas
-const SCOUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    git: {
-      type: 'object',
-      properties: {
-        isRepo: { type: 'boolean' },
-        clean: { type: 'boolean', description: 'true only if `git status --porcelain` printed nothing (untracked files count as not clean)' },
-        head: { type: 'string', description: 'output of `git rev-parse HEAD`, empty if not a repo' },
-        baseline: { type: 'string', description: 'output of `git stash create`, or the HEAD sha when that prints nothing' },
-        cwdTopLevel: { type: 'string', description: 'output of `git rev-parse --show-toplevel` run in your own starting directory, empty if not a repo' },
-        rootTopLevel: { type: 'string', description: 'output of `git -C <projectRoot> rev-parse --show-toplevel`' },
-        untrackedAtStart: { type: 'array', items: { type: 'string' } },
-      },
-      required: ['isRepo', 'clean', 'head', 'baseline', 'cwdTopLevel', 'rootTopLevel', 'untrackedAtStart'],
-    },
-    testCommand: { type: 'string', description: 'command that runs the project tests from the project root; empty if none found' },
-    criteria: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          id: { type: 'string' },
-          files: { type: 'array', items: { type: 'string' }, description: 'paths relative to the project root' },
-        },
-        required: ['id', 'files'],
-      },
-    },
-  },
-  required: ['git', 'testCommand', 'criteria'],
+let repo = input.repo
+if (typeof repo === 'string') {
+  try { repo = JSON.parse(repo) } catch (e) { repo = null }
 }
+if (!repo || typeof repo.isRepo !== 'boolean') {
+  return { error: 'Missing args.repo. Run scripts/repo-state.sh <projectRoot> <your primary working directory> and pass its JSON output verbatim as repo.' }
+}
+const git = {
+  isRepo: repo.isRepo, clean: repo.clean === true, head: String(repo.head || ''), baseline: String(repo.baseline || ''),
+  cwdTopLevel: String(repo.cwdTopLevel || ''), rootTopLevel: String(repo.rootTopLevel || ''),
+  untrackedAtStart: Array.isArray(repo.untrackedAtStart) ? repo.untrackedAtStart.map(String) : [],
+}
+const testCommand = String(input.testCommand || '')
 
+// Groups come from the orchestrator: criteria that may touch the same files share a group
+// (one developer). Without groups, one developer takes every criterion.
+let groupIds = [CRITERIA.map(c => c.id)]
+if (input.groups != null) {
+  if (!Array.isArray(input.groups) || !input.groups.length || !input.groups.every(g => Array.isArray(g) && g.length)) {
+    return { error: 'args.groups must be a non-empty array of non-empty arrays of criterion ids.' }
+  }
+  groupIds = input.groups.map(g => g.map(String))
+  const flat = groupIds.flat()
+  const unknown = flat.filter(id => !byId[id])
+  const twice = flat.filter((id, i) => flat.indexOf(id) !== i)
+  const missing = CRITERIA.map(c => c.id).filter(id => !flat.includes(id))
+  if (unknown.length || twice.length || missing.length) {
+    return { error: `args.groups must list every criterion id exactly once.${unknown.length ? ` Unknown: ${unknown.join(', ')}.` : ''}${twice.length ? ` Repeated: ${[...new Set(twice)].join(', ')}.` : ''}${missing.length ? ` Missing: ${missing.join(', ')}.` : ''}` }
+  }
+}
+const GROUPS = groupIds.map((ids, i) => ({ id: String(i + 1), criteria: ids.map(id => byId[id]) }))
+
+// ---------------------------------------------------------------- schemas
 const DEV_SCHEMA = {
   type: 'object',
   properties: {
@@ -157,7 +156,6 @@ async function call(prompt, opts) {
 }
 
 const list = cs => cs.map(c => `- [${c.id}] ${c.text}`).join('\n')
-const norm = p => String(p).replace(/^\.\//, '').replace(new RegExp('^' + ROOT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '/'), '')
 
 const COMMON_RULES = `Rules for everyone in this run:
 - Never ask a question: no one will answer. A reversible choice the spec does not settle is yours: make it and report it.
@@ -208,9 +206,9 @@ ${COMMON_RULES}`
 }
 
 // reviews[i] answers personas[i]; a review is null when its agent died twice.
-async function panel(criteria, where, context, phaseTitle, tag, personas = PERSONAS) {
+async function panel(criteria, where, context, phaseTitle, tag, effort, personas = PERSONAS) {
   const reviews = await parallel(personas.map(p => () =>
-    call(panelPrompt(p, criteria, where, context), { ...CRITIC, schema: PANEL_SCHEMA, phase: phaseTitle, label: `${tag} — ${p.label}` })))
+    call(panelPrompt(p, criteria, where, context), { model: 'opus', effort, schema: PANEL_SCHEMA, phase: phaseTitle, label: `${tag} — ${p.label} (opus ${effort})` })))
   return { personas, reviews }
 }
 
@@ -235,55 +233,13 @@ function collectOutside({ reviews }, sink) {
   for (const r of reviews) for (const o of (r && r.outsideSpec) || []) sink.push(o)
 }
 
-// ================================================================= 1. scout
-phase('Repérage')
-const scoutPrompt = `Mechanical survey for a coding run. Do not modify anything.
-
-Project root: ${ROOT}
-Spec: ${SPEC}
-Criteria:
-${list(CRITERIA)}
-
-1. For each criterion, list the files (paths relative to the project root) a developer will most likely create or modify to satisfy it. Look with Glob, Grep and Read; do not guess. A file that does not exist yet: give the path where it would go. Use the ids above.
-2. Repository state — run these exactly and report the raw results:
-   - in your starting directory: \`git rev-parse --show-toplevel\` → cwdTopLevel (empty on error)
-   - \`git -C ${ROOT} rev-parse --show-toplevel\` → rootTopLevel; isRepo = it succeeded
-   - \`git -C ${ROOT} status --porcelain\` → clean = printed nothing
-   - \`git -C ${ROOT} rev-parse HEAD\` → head
-   - \`git -C ${ROOT} stash create\` → baseline (it changes nothing; when it prints nothing, use head)
-   - \`git -C ${ROOT} ls-files --others --exclude-standard\` → untrackedAtStart
-3. The command that runs the project's tests from the root (package.json scripts, Makefile, pyproject, CLAUDE.md, README). Empty if none.`
-
-let scout = await agent(scoutPrompt, { ...SCOUT, schema: SCOUT_SCHEMA, phase: 'Repérage', label: 'Repérage' })
-if (scout === null) scout = await agent(scoutPrompt, { ...SCOUT_FALLBACK, schema: SCOUT_SCHEMA, phase: 'Repérage', label: 'Repérage (relance opus)' })
-const git = (scout && scout.git) || { isRepo: false, clean: false, head: '', baseline: '', cwdTopLevel: '', rootTopLevel: '', untrackedAtStart: [] }
-const testCommand = (scout && scout.testCommand) || ''
-
-// Group criteria that touch a common file: one developer per group.
-const filesOf = Object.fromEntries(CRITERIA.map(c => [c.id, []]))
-for (const s of (scout && scout.criteria) || []) if (filesOf[String(s.id)]) filesOf[String(s.id)] = (s.files || []).map(norm)
-const parent = Object.fromEntries(CRITERIA.map(c => [c.id, c.id]))
-const find = x => (parent[x] === x ? x : (parent[x] = find(parent[x])))
-const owner = {}
-for (const c of CRITERIA) for (const f of filesOf[c.id]) {
-  if (owner[f]) parent[find(c.id)] = find(owner[f])
-  else owner[f] = c.id
-}
-const groupsMap = {}
-for (const c of CRITERIA) (groupsMap[find(c.id)] = groupsMap[find(c.id)] || []).push(c)
-const GROUPS = Object.values(groupsMap).map((cs, i) => ({
-  id: String(i + 1),
-  criteria: cs,
-  files: [...new Set(cs.flatMap(c => filesOf[c.id]))],
-}))
-
 // Parallel groups need isolated worktrees: only safe on a clean repo the session itself runs in.
 const sameRepo = git.isRepo && git.cwdTopLevel && git.cwdTopLevel === git.rootTopLevel
-const MODE = input.parallel !== false && GROUPS.length > 1 && git.isRepo && git.clean && sameRepo ? 'worktree' : 'shared'
+const MODE = input.parallel !== false && GROUPS.length > 1 && git.isRepo && git.clean && git.head && sameRepo ? 'worktree' : 'shared'
 const BASE = MODE === 'worktree' ? git.head : (git.baseline || git.head)
 log(`${CRITERIA.length} critère(s), ${GROUPS.length} groupe(s), ${MODE === 'worktree' ? 'en parallèle (copies isolées)' : 'l’un après l’autre dans le projet'}`)
 if (GROUPS.length > 1 && MODE === 'shared') {
-  log(`Pas de parallèle : ${!git.isRepo ? 'pas de dépôt git' : !git.clean ? 'modifications en cours dans le projet' : !sameRepo ? 'la session tourne hors du projet' : 'désactivé'}`)
+  log(`Pas de parallèle : ${!git.isRepo ? 'pas de dépôt git' : !git.clean ? 'modifications en cours dans le projet' : !git.head ? 'aucun commit dans le dépôt' : !sameRepo ? 'la session tourne hors du projet' : 'désactivé'}`)
 }
 
 const diffHint = git.isRepo
@@ -294,6 +250,7 @@ const diffHint = git.isRepo
 const decisions = []
 const outsideSpec = []
 const doneGroups = [] // shared mode: groups already run in the project itself
+let topEffort = DEV_EFFORTS[0] // highest developer effort reached in the run
 
 async function runGroup(g) {
   const tag = `Groupe ${g.id}`
@@ -305,6 +262,7 @@ async function runGroup(g) {
   let blocker = ''
   for (let round = 0; round < DEV_EFFORTS.length && pending.length; round++) {
     const effort = DEV_EFFORTS[round]
+    if (round > DEV_EFFORTS.indexOf(topEffort)) topEffort = effort
     const isolated = MODE === 'worktree' && where === null
     const workspaceRule = isolated
       ? `You are in an isolated git worktree (your starting directory), separate from the other developers. Work only there. When done, commit all your changes on the worktree's current branch (it is temporary: the fusion step brings it into the project and deletes it).`
@@ -317,7 +275,6 @@ Spec: ${SPEC} — read it first (goal, criteria, out of scope).
 Your criteria:
 ${list(pending)}
 ${g.criteria.length > pending.length ? `Already validated in this group, keep them working:\n${list(g.criteria.filter(c => !pending.includes(c)))}\n` : ''}Other criteria of the spec belong to other developers: do not implement them.
-Files the scout expects you to touch (a hint, not a limit): ${g.files.length ? g.files.join(', ') : 'unknown'}.
 
 ${workspaceRule}
 ${feedback ? `\nThe critics rejected the previous round. Their proof:\n${feedback}\nFix the cause, not the symptom, then re-check every criterion of yours.\n` : ''}
@@ -348,10 +305,10 @@ ${COMMON_RULES}`
       break
     }
     const others = MODE === 'shared' ? doneGroups : []
-    const context = `${others.length ? `Earlier groups of this run already changed the project for other criteria — those changes are not yours to judge, not defects and not outside-spec issues: ${others.map(o => `${o.files.join(', ') || 'files unknown'} (criteria ${o.criteria.map(c => c.id).join(', ')})`).join('; ')}.\n` : ''}Developer's summary (a claim, not evidence): ${dev.summary}
+    const context = `${others.length ? `Earlier groups of this run already changed the project for other criteria — those changes are not yours to judge, not defects and not outside-spec issues: criteria ${others.map(o => o.criteria.map(c => c.id).join(', ')).join('; ')}.\n` : ''}Developer's summary (a claim, not evidence): ${dev.summary}
 Developer's self-check (a claim, not evidence): ${(dev.selfCheck || []).map(s => `[${s.id}] ${s.status}: ${s.evidence}`).join(' | ')}
 ${diffHint.replace('<tree>', where)}${testCommand ? `\nProject tests: \`${testCommand}\` (run from ${where}).` : ''}`
-    const reviews = await panel(pending, where, context, 'Critique', `${tag} — critique essai ${round + 1}`)
+    const reviews = await panel(pending, where, context, 'Critique', `${tag} — critique essai ${round + 1}`, criticEffort(effort))
     collectOutside(reviews, outsideSpec)
     const rejected = []
     for (const c of pending) {
@@ -422,7 +379,7 @@ ${diffHint.replace('<tree>', ROOT)}${testCommand ? `\nProject tests: \`${testCom
   // Groups merged from isolated copies need the full panel; groups run one after the
   // other in the project already saw each other's work, so only regressions remain: the tester.
   const finalPanel = MODE === 'worktree' ? PERSONAS : PERSONAS.filter(p => p.key === 'tester')
-  const reviews = await panel(finalCriteria, ROOT, ctx, 'Contrôle final', 'Contrôle final', finalPanel)
+  const reviews = await panel(finalCriteria, ROOT, ctx, 'Contrôle final', 'Contrôle final', criticEffort(topEffort), finalPanel)
   collectOutside(reviews, outsideSpec)
   const broken = finalCriteria.filter(c => judge(c, reviews).status === 'defect')
   finalCheck = { checked: finalIds, regressions: broken.map(c => c.id), repaired: [] }
@@ -441,7 +398,7 @@ Work in ${ROOT}; do not commit. Re-run the reproduction and the project tests${t
 
 ${COMMON_RULES}`, { ...REPAIR, schema: REPAIR_SCHEMA, phase: 'Contrôle final', label: 'Réparation (opus xhigh)' })
     if (repair) for (const d of repair.decisions || []) decisions.push(d)
-    const recheck = await panel(broken, ROOT, ctx + `\nA repair was just made: ${repair ? repair.summary : 'the repair agent failed'}.`, 'Contrôle final', 'Contrôle final — après réparation', PERSONAS)
+    const recheck = await panel(broken, ROOT, ctx + `\nA repair was just made: ${repair ? repair.summary : 'the repair agent failed'}.`, 'Contrôle final', 'Contrôle final — après réparation', criticEffort(REPAIR.effort), PERSONAS)
     collectOutside(recheck, outsideSpec)
     for (const c of finalCriteria) {
       const j = judge(c, broken.includes(c) ? recheck : reviews)
@@ -473,7 +430,7 @@ log(`Fin : ${counts.validated}/${CRITERIA.length} validé(s), ${counts.unverifie
 
 return {
   mode: MODE,
-  groups: GROUPS.map(g => ({ id: g.id, criteria: g.criteria.map(c => c.id), files: g.files })),
+  groups: GROUPS.map(g => ({ id: g.id, criteria: g.criteria.map(c => c.id) })),
   criteria: CRITERIA.map(c => ({ id: c.id, text: c.text, ...(status[c.id] || { status: 'failed', reason: 'never reviewed' }) })),
   counts,
   blockers: groupResults.filter(r => r.blocker).map(r => ({ group: r.group, question: r.blocker })),

@@ -28,11 +28,10 @@ well:
 
 | Role | Model |
 |---|---|
-| Scout: files per criterion, repo state, test command | Haiku medium |
 | Developer, one per group of criteria touching the same files | Opus medium → high → xhigh after each rejection |
-| Critics: tester, owner's advocate, maintainer, blind to each other | Opus xhigh |
+| Critics: tester, owner's advocate, maintainer, blind to each other | Opus, one tier above the developer (high, then xhigh) |
 | Fusion of groups developed in parallel (isolated git worktrees) | Opus high |
-| Final check of every criterion on the integrated result | Opus xhigh |
+| Final check of every criterion on the integrated result | Opus, one tier above the highest developer effort |
 
 A criterion passes only when the tester verified it on the real result
 and no critic proved a defect. Three rejected rounds on a criterion stop
@@ -42,3 +41,5 @@ project itself.
 
 `scripts/keep-waiting.sh` keeps the main agent's turn open while the
 workflow runs in the background, so a wait never ends the run.
+`scripts/repo-state.sh` reads the repository state the workflow needs
+(clean tree, base commit, untracked files) without spending an agent.
