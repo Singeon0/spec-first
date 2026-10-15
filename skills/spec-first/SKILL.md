@@ -14,6 +14,7 @@ description: >-
 disable-model-invocation: true
 allowed-tools:
   - Workflow
+  - ProposeGoal
 ---
 
 # Spec-first — he owns the what, you own the how
@@ -164,6 +165,27 @@ the end — §8), you are **truly blocked**, or the **spec
 must change** (present the change as an option; act only on his yes).
 Before each reply in a long run, re-check in one breath: scope unchanged,
 verdict first, nothing settled re-opened.
+
+**Right after his go, propose the goal.** In the turn that launches the
+run, call `ProposeGoal` (load it with ToolSearch if it is deferred) with
+`ask_user: true`: he approves with one key, you never set it yourself. The
+condition mirrors the stop points, in French, one sentence:
+« Le contrôle final de specs/<fichier>.md rapporte N/N critères validés
+et le nettoyage est fait, OU une seule question lettrée attend la
+décision du propriétaire (blocage ou changement de spec). »
+- The goal keeps the run going: a turn that ends before a stop point is
+  sent back to work. Never ask him to say « continue ».
+- A separate evaluator judges it from the conversation alone — it cannot
+  read files or run commands. So the stop-point message quotes the
+  evidence: each criterion's verdict, the critics' count (« 4/4
+  validés »), the clean-up report.
+- While a workflow runs in the background, the evaluation waits for it;
+  end the turn as usual (§7).
+- Findings outside the spec never enter the goal: they go to a second
+  spec (§8).
+- If he declines, or the tool is missing (older Claude Code, hooks
+  disabled, untrusted folder), carry on without it and do not propose it
+  again.
 
 When he hands over full authority (« prends la meilleure décision »):
 decide, act, report in one or two sentences. For significant merges,
