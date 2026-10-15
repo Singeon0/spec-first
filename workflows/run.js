@@ -74,7 +74,7 @@ const DEV_SCHEMA = {
         required: ['id', 'status', 'evidence'],
       },
     },
-    decisions: { type: 'array', items: { type: 'string' }, description: 'choices the spec did not settle that change what the owner can see or use, one short sentence each, in French, in plain words (what the result does, not how; no file or library names). Not what you did not do. Usually empty.' },
+    decisions: { type: 'array', items: { type: 'string' }, description: 'choices the spec did not settle that change what the owner can see or use, one short sentence each, in French, in plain words (what the result does, not how; no file or library names). Not what you did not do, and not problems outside the spec — the critics report those. Usually empty.' },
     blocker: { type: 'string', description: 'empty unless the spec itself must change or the owner must decide before any progress is possible' },
   },
   required: ['workspace', 'branch', 'changed', 'files', 'summary', 'selfCheck', 'decisions', 'blocker'],
