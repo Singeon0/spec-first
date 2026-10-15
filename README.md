@@ -42,20 +42,25 @@ and no critic proved a defect. Three rejected rounds on a criterion stop
 the run and go back to the owner.
 
 The plugin ships a ready-made workflow, `spec-first:run`
-(`workflows/run.js`), that does all of it for a spec: groups run at once
-in copies each developer makes from the project's current commit, on
-any branch, then are merged. A spec launches only on a clean git
-repository (nothing uncommitted but the spec file): there is no
-sequential mode. The orchestrator may wrap it
-in workflows of its own.
+(`workflows/run.js`), that does all of it for a spec: groups run at once,
+each developer in its own copy of the project (`.claude/worktrees/`,
+hidden from git) made from the commit the run starts from, on any branch,
+then are merged. The run starts from a clean git repository: the owner
+never commits by hand — work in progress is committed by Claude, with his
+go, before launching; there is no sequential mode. A `setupCommand`
+makes each copy runnable (dependencies, local config), and every agent
+gets its own ports. The orchestrator may wrap the workflow in workflows
+of its own.
 
 ## The end
 
-A spec ends. Once the criteria pass, an Opus sub-agent cleans the
-repository: merged branches of the work, leftover worktrees and temporary
-files, and whatever the merged change made useless (one local commit,
-tests re-run). Remote branches, unmerged branches and anything else that
-cannot be undone wait for the owner's yes. The last reply says the spec is
+A spec ends. Once the criteria pass, the result is committed locally
+(« spec : <nom> »), then an Opus sub-agent cleans the repository in a
+second local commit (« nettoyage : <nom> », tests re-run): temporary
+files, worktrees and branches whose work was merged, and whatever the
+merged change made useless. Nothing is pushed. Work the fusion could not
+merge stays on its branch; remote branches, unmerged branches and
+anything else that cannot be undone wait for the owner's yes. The last reply says the spec is
 done and stops — no next steps. What the work revealed beyond the spec
 (a task wider than planned, a neighbouring problem) is written as a draft
 second spec, to launch in a new conversation; the run never grows to
