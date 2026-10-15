@@ -43,9 +43,9 @@ the run and go back to the owner.
 
 The plugin ships a ready-made workflow, `spec-first:run`
 (`workflows/run.js`), that does all of it for a spec: groups run at once
-in isolated copies, then are merged. When isolated copies cannot work
-(`parallel: false`, or a developer finds its copy unusable), groups run
-one after the other in the project itself. The orchestrator may wrap it
+in copies each developer makes from the project's current commit, on
+any branch, then are merged. Only a project outside git or holding
+uncommitted changes makes groups run one after the other in it. The orchestrator may wrap it
 in workflows of its own.
 
 ## The end

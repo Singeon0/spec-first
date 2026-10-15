@@ -272,15 +272,12 @@ call `Workflow({name: "spec-first:run", args: {specPath, projectRoot,
 criteria: [{id, text}], groups, testCommand}})` with absolute paths and
 the criteria numbered as in the spec:
 - `groups`: every criterion id once; criteria that may touch the same
-  files share a group. Each group gets its own developer in an isolated
-  copy of the project, all at once, then merged — cut as fine as the code
-  allows. Omitted: one developer takes everything.
-- `parallel: false` when isolated copies cannot serve: they start from
-  the latest commit of the default branch of the session's repository, so
-  the project must be that repository, sitting on that commit, with no
-  uncommitted change. Otherwise groups run one after the other in the
-  project itself — passing it saves a round of developers that would
-  find their copy unusable.
+  files share a group. Every group gets its own developer, all at once,
+  each in a copy of the project it makes from the project's current
+  commit, whatever the branch — then merged. Cut as fine as the code
+  allows: one group per independent criterion. Omitted: one developer
+  takes everything. When the project is not a git repository or holds
+  uncommitted changes, groups run one after the other in it instead.
 - `testCommand`: runs the project tests from its root; omit it if none.
 
 Use it as is, or surround it with your own workflows when the spec calls

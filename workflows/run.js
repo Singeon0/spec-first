@@ -1,7 +1,7 @@
 export const meta = {
   name: 'run',
   description: 'spec-first autonomous run: one developer per group of independent criteria, three-critic panel one effort tier above the developer, effort escalation, fusion, final check of every criterion',
-  whenToUse: 'Called by the spec-first skill after the owner gave his go on a spec. args: { specPath, projectRoot, criteria: [{ id, text }], groups?: [[ids]], testCommand?, parallel? } with absolute paths; parallel: false when isolated git worktrees cannot serve: they start from the latest commit of the default branch of the session repository, so the project must be that repository, on that commit, with no uncommitted change. Not for a bare slash-command call without args: tell the user to run /spec-first instead.',
+  whenToUse: 'Called by the spec-first skill after the owner gave his go on a spec. args: { specPath, projectRoot, criteria: [{ id, text }], groups?: [[ids]], testCommand? } with absolute paths. Groups always run at once, each developer in a git worktree it creates from the current commit of the project, whatever the branch; the run falls back to one group after the other in the project only when it is not a git repository or holds uncommitted changes. Not for a bare slash-command call without args: tell the user to run /spec-first instead.',
   phases: [
     { title: 'Développement', detail: 'opus, one developer per group of criteria; medium, then high, then xhigh after each rejection' },
     { title: 'Critique', detail: 'opus, one tier above the developer (high, then xhigh): tester, owner and maintainer judge each criterion blind to each other' },
@@ -222,9 +222,11 @@ function collectOutside({ reviews }, sink) {
   for (const r of reviews) for (const o of (r && r.outsideSpec) || []) sink.push(o)
 }
 
-// Groups run in parallel, each in its own git worktree, unless the orchestrator passed parallel: false.
-// Each isolated developer first checks that its copy can serve; a group whose copy cannot reruns in the project itself.
-const MODE = input.parallel !== false && GROUPS.length > 1 ? 'worktree' : 'shared'
+// Groups run in parallel, each developer in a git worktree it creates itself from the project's current
+// commit (any branch, nested repositories included). No cap on the number of groups. When the project
+// is not a git repository or holds uncommitted changes, the developer reports it and its group reruns
+// in the project itself, one after the other.
+const MODE = GROUPS.length > 1 ? 'worktree' : 'shared'
 const ISOLATION = 'ISOLATION:'
 log(`${CRITERIA.length} critère(s), ${GROUPS.length} groupe(s), ${MODE === 'worktree' ? 'en parallèle (copies isolées)' : 'l’un après l’autre dans le projet'}`)
 
@@ -256,8 +258,8 @@ async function runGroup(g, mode) {
     if (round > DEV_EFFORTS.indexOf(topEffort)) topEffort = effort
     const isolated = mode === 'worktree' && where === null
     const workspaceRule = isolated
-      ? `You are in an isolated git worktree (your starting directory), separate from the other developers. Before changing anything, check that this copy can serve: it belongs to the same repository as ${ROOT} (\`git rev-parse --git-common-dir\` and \`git -C ${ROOT} rev-parse --git-common-dir\` resolve to the same directory), it starts from the same commit (\`git rev-parse HEAD\` equals \`git -C ${ROOT} rev-parse HEAD\`), ${ROOT} has no uncommitted change to tracked files (\`git -C ${ROOT} status --porcelain --untracked-files=no\` prints nothing), and no untracked file of ${ROOT} matters to your criteria. If a check fails, change nothing and return a blocker starting with "${ISOLATION}" and the reason in a few French words.
-Otherwise work only in this copy. When done, commit all your changes on the worktree's current branch (it is temporary: the fusion step brings it into the project and deletes it).`
+      ? `Other developers work on other criteria at the same time, so you work in your own copy of the project. First check that one can be made: ${ROOT} is the top of a git repository (\`git -C ${ROOT} rev-parse --show-toplevel\` prints ${ROOT} or the same folder through a symlink), has no uncommitted change to tracked files (\`git -C ${ROOT} status --porcelain --untracked-files=no\` prints nothing), and no untracked file of ${ROOT} matters to your criteria. If a check fails, change nothing, create nothing, and return a blocker starting with "${ISOLATION}" and the reason in a few French words.
+Otherwise create your copy from the current commit of ${ROOT}, whatever its branch: \`d=$(mktemp -d) && git -C ${ROOT} worktree add -b spec-first-g${g.id}-$(basename "$d") "$d/wt" HEAD\`. Work only in "$d/wt": every file you read or edit must be under it, never under ${ROOT}. When done, commit all your changes on that branch (it is temporary: the fusion step brings it into the project and deletes it). Return that worktree as workspace and that branch as branch, even if you changed nothing. These checks and this copy are plumbing: never mention them in decisions.`
       : mode === 'worktree' && where !== ROOT
         ? `Your workspace is the git worktree ${where} (branch ${branch}). Every file you read or edit must be under ${where} — not under ${ROOT}. cd there first. When done, commit your changes on that branch.`
         : `Work directly in the project at ${ROOT}. Do not commit unless CLAUDE.md asks for it.`
@@ -278,7 +280,6 @@ ${COMMON_RULES}`
     const dev = await call(devPrompt, {
       model: 'opus', effort, schema: DEV_SCHEMA, phase: 'Développement',
       label: `${tag} — dév essai ${round + 1} (opus ${effort})`,
-      ...(isolated ? { isolation: 'worktree' } : {}),
     })
     if (!dev) {
       for (const c of pending) results[c.id] = { status: 'failed', rounds: round + 1, reason: 'developer agent died twice' }
@@ -289,8 +290,8 @@ ${COMMON_RULES}`
       return { group: g.id, retryShared: dev.blocker.slice(ISOLATION.length).trim() || 'copie isolée inutilisable' }
     }
     if (isolated) {
-      where = dev.changed && dev.workspace ? dev.workspace.replace(/\/+$/, '') : ROOT
-      branch = dev.changed ? dev.branch : ''
+      where = dev.workspace ? dev.workspace.replace(/\/+$/, '') : ROOT
+      branch = where !== ROOT ? dev.branch : ''
     }
     for (const f of dev.files || []) { files.push(f); runFiles.push(f) }
     for (const d of dev.decisions || []) decisions.push(d)
@@ -360,7 +361,7 @@ ${list(CRITERIA)}
 
 1. For each branch, apply its changes since that HEAD to the working tree of ${ROOT} without committing (e.g. \`git -C ${ROOT} cherry-pick --no-commit HEAD..<branch>\`, or \`git -C ${ROOT} diff HEAD <branch> | git -C ${ROOT} apply --3way\`). The working tree of ${ROOT} may already hold changes of groups that ran in it during this run: keep them. Resolve every conflict so that each group's criteria still hold: read both sides and keep both intents.
 2. Run the project tests${testCommand ? ` (\`${testCommand}\`)` : ''} from ${ROOT} and fix what the integration broke — only that.
-3. Clean up only what this run created: \`git worktree remove\` each worktree listed above and delete each listed branch. Leave ${ROOT} with uncommitted changes; do not commit.
+3. Clean up only what this run created: \`git worktree remove\` each worktree listed above, delete each listed branch, and remove the now empty temporary folder that held each worktree (\`rmdir "$(dirname <worktree>)"\`). Leave ${ROOT} with uncommitted changes; do not commit.
 
 ${COMMON_RULES}`, { ...FUSION, schema: FUSION_SCHEMA, phase: 'Fusion', label: 'Fusion (opus high)' })
     if (fusion) log(`Fusion : ${fusion.integrated.length}/${toMerge.length} groupe(s) intégré(s)`)
