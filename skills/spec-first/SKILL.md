@@ -261,7 +261,9 @@ until each returns. Then:
 - « non vérifié »: say what is missing to check it — never « terminé »;
 - « en échec » after three rounds, or a blocker: stop point (§4) — the
   gap in his terms, options, your recommendation;
-- problems outside the scope: kept for the last reply (§8), never acted on.
+- what you discover beyond the spec — a task wider than planned, a
+  neighbouring problem: never added to this run; it goes to a second
+  spec (§8).
 
 A one-sentence spec (small reversible task, §3) skips the workflow: one
 Opus medium sub-agent does it, one Opus high tester checks it. If the
@@ -294,10 +296,20 @@ the repository as clean as if the work had been done in one go.
 
 **Then the last reply marks the end**, verdict first: « La spec est
 terminée. » Then the result (§2), the criteria checked off, one line on
-the clean-up. Points outside the scope noticed on the way: one line each,
-as material for another conversation — never as options. Close with
-« Pour un autre sujet, ouvre une nouvelle conversation. » If part of the
-clean-up needs his yes, one lettered question on that alone comes last.
+the clean-up. Close with « Pour un autre sujet, ouvre une nouvelle
+conversation. » If part of the clean-up needs his yes, one lettered
+question on that alone comes last.
+
+**What the work revealed goes to a second spec, not to this
+conversation.** A task wider than planned, a neighbouring problem, a
+follow-up: before the last reply, write it to a second spec file next to
+the first, headed « Brouillon — pas encore de go »: the goal in one
+sentence, what was found, proposed criteria. The last reply gives it one
+line: « Ces points méritent une deuxième spec : specs/<x>.md — à lancer
+dans une nouvelle conversation avec /spec-first. » Never offered as
+options to carry on here. If no criterion of this spec can pass without
+that wider work, it is not for the end: it is the stop point « the spec
+must change » (§4).
 Nothing else: no next step, no « on pourrait aussi », no new proposal.
 
 **After the end**, a message from him:
@@ -309,8 +321,10 @@ Nothing else: no next step, no « on pourrait aussi », no new proposal.
 
 Good: « La spec est terminée. Les 4 critères passent, vérifiés par les
 critiques. Nettoyage fait : 3 branches fusionnées et 2 fichiers devenus
-inutiles supprimés. Pour un autre sujet, ouvre une nouvelle conversation.
-Une branche reste sur GitHub : A la supprimer, B la garder. Je recommande
+inutiles supprimés. L'import est plus large que prévu : deuxième spec
+prête dans specs/import-v2.md, à lancer dans une nouvelle conversation.
+Pour un autre sujet, ouvre une nouvelle conversation. Une branche reste
+sur GitHub : A la supprimer, B la garder. Je recommande
 A. Ton choix ? »
 Bad: « C'est fait ! Prochaines étapes possibles : A … B … C … »
 
@@ -329,4 +343,4 @@ Bad: « C'est fait ! Prochaines étapes possibles : A … B … C … »
   options — mid-run, only if the ambiguity blocks the remaining work.
 - Safety or security problem outside the scope: flag it first in your
   next report, never act on it unilaterally — even a good fix outside the
-  spec re-decides his scope for him. Fixing it is a new spec.
+  spec re-decides his scope for him. Fixing it goes to a second spec (§8).

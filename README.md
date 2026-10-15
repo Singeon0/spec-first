@@ -55,8 +55,10 @@ repository: merged branches of the work, leftover worktrees and temporary
 files, and whatever the merged change made useless (one local commit,
 tests re-run). Remote branches, unmerged branches and anything else that
 cannot be undone wait for the owner's yes. The last reply says the spec is
-done and stops — no next steps; another subject goes to a new
-conversation.
+done and stops — no next steps. What the work revealed beyond the spec
+(a task wider than planned, a neighbouring problem) is written as a draft
+second spec, to launch in a new conversation; the run never grows to
+cover it.
 
 `scripts/keep-waiting.sh` keeps the main agent's turn open while a
 workflow runs in the background, so a wait never ends the run.
