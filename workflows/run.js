@@ -1,7 +1,7 @@
 export const meta = {
   name: 'run',
   description: 'spec-first autonomous run: one developer per group of independent criteria, three-critic panel one effort tier above the developer, effort escalation, fusion, final check of every criterion',
-  whenToUse: 'Called by the spec-first skill after the owner gave his go on a spec. args: { specPath, projectRoot, criteria: [{ id, text }], groups?: [[ids]], testCommand?, parallel? } with absolute paths; parallel: false when isolated git worktrees cannot work (no git, uncommitted changes, session outside the project). Not for a bare slash-command call without args: tell the user to run /spec-first instead.',
+  whenToUse: 'Called by the spec-first skill after the owner gave his go on a spec. args: { specPath, projectRoot, criteria: [{ id, text }], groups?: [[ids]], testCommand?, parallel? } with absolute paths; parallel: false when isolated git worktrees cannot serve: they start from the latest commit of the default branch of the session repository, so the project must be that repository, on that commit, with no uncommitted change. Not for a bare slash-command call without args: tell the user to run /spec-first instead.',
   phases: [
     { title: 'Développement', detail: 'opus, one developer per group of criteria; medium, then high, then xhigh after each rejection' },
     { title: 'Critique', detail: 'opus, one tier above the developer (high, then xhigh): tester, owner and maintainer judge each criterion blind to each other' },
