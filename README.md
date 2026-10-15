@@ -44,8 +44,9 @@ the run and go back to the owner.
 The plugin ships a ready-made workflow, `spec-first:run`
 (`workflows/run.js`), that does all of it for a spec: groups run at once
 in copies each developer makes from the project's current commit, on
-any branch, then are merged. Only a project outside git or holding
-uncommitted changes makes groups run one after the other in it. The orchestrator may wrap it
+any branch, then are merged. A spec launches only on a clean git
+repository (nothing uncommitted but the spec file): there is no
+sequential mode. The orchestrator may wrap it
 in workflows of its own.
 
 ## The end

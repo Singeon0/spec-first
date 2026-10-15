@@ -1,7 +1,7 @@
 export const meta = {
   name: 'run',
   description: 'spec-first autonomous run: one developer per group of independent criteria, three-critic panel one effort tier above the developer, effort escalation, fusion, final check of every criterion',
-  whenToUse: 'Called by the spec-first skill after the owner gave his go on a spec. args: { specPath, projectRoot, criteria: [{ id, text }], groups?: [[ids]], testCommand? } with absolute paths. Groups always run at once, each developer in a git worktree it creates from the current commit of the project, whatever the branch; the run falls back to one group after the other in the project only when it is not a git repository or holds uncommitted changes. Not for a bare slash-command call without args: tell the user to run /spec-first instead.',
+  whenToUse: 'Called by the spec-first skill after the owner gave his go on a spec. args: { specPath, projectRoot, criteria: [{ id, text }], groups?: [[ids]], testCommand? } with absolute paths. Groups always run at once, each developer in a git worktree it creates from the current commit of the project, whatever the branch. The project must be a git repository with nothing uncommitted (the spec file aside): the skill checks it before launching. Not for a bare slash-command call without args: tell the user to run /spec-first instead.',
   phases: [
     { title: 'Développement', detail: 'opus, one developer per group of criteria; medium, then high, then xhigh after each rejection' },
     { title: 'Critique', detail: 'opus, one tier above the developer (high, then xhigh): tester, owner and maintainer judge each criterion blind to each other' },
@@ -223,25 +223,24 @@ function collectOutside({ reviews }, sink) {
 }
 
 // Groups run in parallel, each developer in a git worktree it creates itself from the project's current
-// commit (any branch, nested repositories included). No cap on the number of groups. When the project
-// is not a git repository or holds uncommitted changes, the developer reports it and its group reruns
-// in the project itself, one after the other.
+// commit (any branch, nested repositories included). No cap on the number of groups. A clean git
+// repository is a precondition checked by the skill before launch: there is no sequential fallback —
+// if a copy still cannot be made, the group is blocked and the owner is told why.
 const MODE = GROUPS.length > 1 ? 'worktree' : 'shared'
 const ISOLATION = 'ISOLATION:'
-log(`${CRITERIA.length} critère(s), ${GROUPS.length} groupe(s), ${MODE === 'worktree' ? 'en parallèle (copies isolées)' : 'l’un après l’autre dans le projet'}`)
+log(`${CRITERIA.length} critère(s), ${GROUPS.length} groupe(s), ${MODE === 'worktree' ? 'en parallèle (copies isolées)' : 'un seul développeur, dans le projet'}`)
 
 const runFiles = [] // every file the developers reported, relative to the project root
 function changesHint(tree, files) {
   const shown = [...new Set(files)].slice(0, 80)
   return tree !== ROOT
     ? `Changes of this run: \`git -C ${tree} diff $(git -C ${ROOT} rev-parse HEAD)\` — this copy started from that commit and its new files are committed.`
-    : `Changes of this run: ${shown.length ? `these files, relative to ${ROOT}: ${shown.join(', ')} — and in them \`git -C ${ROOT} diff\`` : 'see the developer summary'}. The project may already have held uncommitted changes before the run: those are not this run's.`
+    : `Changes of this run: ${shown.length ? `these files, relative to ${ROOT}: ${shown.join(', ')} — and in them \`git -C ${ROOT} diff\`` : 'see the developer summary'}.`
 }
 
 // ================================================================= 2. per group: dev → panel → escalate
 const decisions = []
 const outsideSpec = []
-const doneGroups = [] // shared mode: groups already run in the project itself
 let topEffort = DEV_EFFORTS[0] // highest developer effort reached in the run
 
 async function runGroup(g, mode) {
@@ -258,7 +257,7 @@ async function runGroup(g, mode) {
     if (round > DEV_EFFORTS.indexOf(topEffort)) topEffort = effort
     const isolated = mode === 'worktree' && where === null
     const workspaceRule = isolated
-      ? `Other developers work on other criteria at the same time, so you work in your own copy of the project. First check that one can be made: ${ROOT} is the top of a git repository (\`git -C ${ROOT} rev-parse --show-toplevel\` prints ${ROOT} or the same folder through a symlink), has no uncommitted change to tracked files (\`git -C ${ROOT} status --porcelain --untracked-files=no\` prints nothing), and no untracked file of ${ROOT} matters to your criteria. If a check fails, change nothing, create nothing, and return a blocker starting with "${ISOLATION}" and the reason in a few French words.
+      ? `Other developers work on other criteria at the same time, so you work in your own copy of the project. First check that one can be made: ${ROOT} is the top of a git repository (\`git -C ${ROOT} rev-parse --show-toplevel\` prints ${ROOT} or the same folder through a symlink), and has no uncommitted change to tracked files (\`git -C ${ROOT} status --porcelain --untracked-files=no\` prints nothing). If a check fails, change nothing, create nothing, and return a blocker starting with "${ISOLATION}" and the reason in a few French words.
 Otherwise create your copy from the current commit of ${ROOT}, whatever its branch: \`d=$(mktemp -d) && git -C ${ROOT} worktree add -b spec-first-g${g.id}-$(basename "$d") "$d/wt" HEAD\`. Work only in "$d/wt": every file you read or edit must be under it, never under ${ROOT}. When done, commit all your changes on that branch (it is temporary: the fusion step brings it into the project and deletes it). Return that worktree as workspace and that branch as branch, even if you changed nothing. These checks and this copy are plumbing: never mention them in decisions.`
       : mode === 'worktree' && where !== ROOT
         ? `Your workspace is the git worktree ${where} (branch ${branch}). Every file you read or edit must be under ${where} — not under ${ROOT}. cd there first. When done, commit your changes on that branch.`
@@ -287,7 +286,9 @@ ${COMMON_RULES}`
       break
     }
     if (isolated && !dev.changed && String(dev.blocker || '').startsWith(ISOLATION)) {
-      return { group: g.id, retryShared: dev.blocker.slice(ISOLATION.length).trim() || 'copie isolée inutilisable' }
+      const reason = `Copie isolée impossible : ${dev.blocker.slice(ISOLATION.length).trim() || 'raison inconnue'}. Le projet doit être un dépôt git sans modification non commitée.`
+      for (const c of pending) results[c.id] = { status: 'blocked', rounds: round + 1, reason }
+      return { group: g.id, criteria: g.criteria.map(c => c.id), where: null, branch: '', results, blocker: reason }
     }
     if (isolated) {
       where = dev.workspace ? dev.workspace.replace(/\/+$/, '') : ROOT
@@ -301,8 +302,7 @@ ${COMMON_RULES}`
       pending = []
       break
     }
-    const others = mode === 'shared' ? doneGroups : []
-    const context = `${others.length ? `Earlier groups of this run already changed the project for other criteria — those changes are not yours to judge, not defects and not outside-spec issues: criteria ${others.map(o => o.criteria.map(c => c.id).join(', ')).join('; ')}.\n` : ''}Developer's summary (a claim, not evidence): ${dev.summary}
+    const context = `Developer's summary (a claim, not evidence): ${dev.summary}
 Developer's self-check (a claim, not evidence): ${(dev.selfCheck || []).map(s => `[${s.id}] ${s.status}: ${s.evidence}`).join(' | ')}
 ${changesHint(where, files)}${testCommand ? `\nProject tests: \`${testCommand}\` (run from ${where}).` : ''}`
     const reviews = await panel(pending, where, context, 'Critique', `${tag} — critique essai ${round + 1}`, criticEffort(effort))
@@ -321,21 +321,14 @@ ${changesHint(where, files)}${testCommand ? `\nProject tests: \`${testCommand}\`
     feedback = rejected.map(c => `[${c.id}] ${results[c.id].reason}`).join('\n')
     pending = rejected
   }
-  doneGroups.push(g)
   return { group: g.id, criteria: g.criteria.map(c => c.id), where, branch, results, blocker }
 }
 
 let groupResults
 if (MODE === 'worktree') {
   groupResults = await parallel(GROUPS.map(g => () => runGroup(g, 'worktree')))
-  const retry = GROUPS.filter((g, i) => groupResults[i] && groupResults[i].retryShared)
-  if (retry.length) {
-    log(`Copie isolée impossible (${groupResults.find(r => r && r.retryShared).retryShared}) : ${retry.length} groupe(s) repris l’un après l’autre dans le projet`)
-    for (const g of retry) groupResults[GROUPS.indexOf(g)] = await runGroup(g, 'shared')
-  }
 } else {
-  groupResults = []
-  for (const g of GROUPS) groupResults.push(await runGroup(g, 'shared'))
+  groupResults = [await runGroup(GROUPS[0], 'shared')]
 }
 groupResults = groupResults.map((r, i) => r || {
   group: GROUPS[i].id, criteria: GROUPS[i].criteria.map(c => c.id), where: null, branch: '', blocker: '',
@@ -431,7 +424,7 @@ for (const c of CRITERIA) counts[(status[c.id] || { status: 'failed' }).status] 
 log(`Fin : ${counts.validated}/${CRITERIA.length} validé(s), ${counts.unverified} non vérifié(s), ${counts.failed} en échec, ${counts.blocked} bloqué(s)`)
 
 return {
-  mode: groupResults.some(r => r.where && r.where !== ROOT) ? 'worktree' : 'shared',
+  mode: MODE,
   groups: GROUPS.map(g => ({ id: g.id, criteria: g.criteria.map(c => c.id) })),
   criteria: CRITERIA.map(c => ({ id: c.id, text: c.text, ...(status[c.id] || { status: 'failed', reason: 'never reviewed' }) })),
   counts,

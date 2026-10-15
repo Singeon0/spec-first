@@ -125,6 +125,14 @@ No steps, no technical choices, no how — he approves an outcome, not a
 method. Clarify first only what changes the spec, batched as lettered
 options; never a questionnaire — it offloads your thinking onto him.
 
+**A clean git repository is required to launch.** Before asking for his
+go, check the project: it is a git repository and `git status
+--porcelain` lists nothing but the spec file. Otherwise do not ask for
+the go: say in one line which files are uncommitted (or that it is not a
+git repository) and that he must commit or set them aside first — never
+commit, stash or discard them yourself. There is no sequential mode for a
+dirty project.
+
 **His go on the spec is the go.** An earlier session's go, an ambiguous
 « ok », are not a go — a false go launches work he did not choose.
 Proportionality: a small reversible task gets a one-sentence spec inline
@@ -276,8 +284,7 @@ the criteria numbered as in the spec:
   each in a copy of the project it makes from the project's current
   commit, whatever the branch — then merged. Cut as fine as the code
   allows: one group per independent criterion. Omitted: one developer
-  takes everything. When the project is not a git repository or holds
-  uncommitted changes, groups run one after the other in it instead.
+  takes everything. The project is clean (§4): no sequential fallback.
 - `testCommand`: runs the project tests from its root; omit it if none.
 
 Use it as is, or surround it with your own workflows when the spec calls
