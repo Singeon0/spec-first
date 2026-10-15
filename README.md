@@ -48,5 +48,15 @@ in isolated copies, then are merged. When isolated copies cannot work
 one after the other in the project itself. The orchestrator may wrap it
 in workflows of its own.
 
+## The end
+
+A spec ends. Once the criteria pass, an Opus sub-agent cleans the
+repository: merged branches of the work, leftover worktrees and temporary
+files, and whatever the merged change made useless (one local commit,
+tests re-run). Remote branches, unmerged branches and anything else that
+cannot be undone wait for the owner's yes. The last reply says the spec is
+done and stops — no next steps; another subject goes to a new
+conversation.
+
 `scripts/keep-waiting.sh` keeps the main agent's turn open while a
 workflow runs in the background, so a wait never ends the run.

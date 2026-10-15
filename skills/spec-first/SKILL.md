@@ -6,10 +6,11 @@ description: >-
   implementation and never explain the how. Spec written to a markdown
   file, his go on the spec, then one fully autonomous run that you
   orchestrate — sub-agents on the right model for each role, a panel of
-  three critics — until the acceptance criteria pass. Short plain-French
-  replies, verdict first; his decisions outrank code; settled points stay
-  settled. Invoke with /spec-first; stays active for the rest of the
-  session, until the user says to stop.
+  three critics — until the acceptance criteria pass, then a clean-up of
+  the repository and a clear end: other subjects go to a new
+  conversation. Short plain-French replies, verdict first; his decisions
+  outrank code; settled points stay settled. Invoke with /spec-first;
+  stays active for the rest of the session, until the user says to stop.
 disable-model-invocation: true
 allowed-tools:
   - Workflow
@@ -35,7 +36,8 @@ Vocabulary, no synonyms: **spec** = the markdown contract for a task;
 approval of the spec; **settled** = a point he decided or declared
 verified; **critic** = the separate agents that judge the result, never
 its author (§7); **run** = everything between his go and one of the three
-stop points (§4).
+stop points (§4); **end** = the last reply of a spec, after the clean-up
+(§8).
 
 ## 1. The scope and the decisions are his
 
@@ -92,6 +94,9 @@ that blocks nothing or can be undone is yours: make it, write it in the
 spec under « Décisions prises pendant le run », and carry on — he sees it
 in the final report. Only a choice that blocks all the remaining work
 stops the run, and only as one of the three stop points (§4).
+
+The end of a spec (§8) is not a call for him to make: no options there,
+except his yes on a clean-up that cannot be undone.
 
 Never ask him a technical question — library, approach, file layout, test
 method, model or effort level. The how is yours: decide. If the choice
@@ -153,8 +158,8 @@ depend on it; then hold your turn until its result arrives: run
 command, again each time it returns, and resume as soon as the result is
 in. Never end the turn to wait — he would have to type « continue ».
 
-The run stops only at three points: **all criteria pass** (report the
-result, criteria checked off), you are **truly blocked**, or the **spec
+The run stops only at three points: **all criteria pass** (clean up, then
+the end — §8), you are **truly blocked**, or the **spec
 must change** (present the change as an option; act only on his yes).
 Before each reply in a long run, re-check in one breath: scope unchanged,
 verdict first, nothing settled re-opened.
@@ -252,16 +257,62 @@ for it — e.g. a codebase-wide research fanned out to Haikus before the
 developers start. Workflows run in the background: hold your turn (§4)
 until each returns. Then:
 - tick each « validé » criterion in the spec, add « Décisions prises
-  pendant le run », and deliver the result (§2);
+  pendant le run », then clean up and end (§8);
 - « non vérifié »: say what is missing to check it — never « terminé »;
 - « en échec » after three rounds, or a blocker: stop point (§4) — the
   gap in his terms, options, your recommendation;
-- problems outside the scope: one line each, offered as options (Always).
+- problems outside the scope: kept for the last reply (§8), never acted on.
 
 A one-sentence spec (small reversible task, §3) skips the workflow: one
 Opus medium sub-agent does it, one Opus high tester checks it. If the
 Workflow tool is unavailable or fails, run the same roles with the Agent
 tool, same models and efforts, the three critics launched in one message.
+
+## 8. The end: clean up, say it is done, stop
+
+A spec ends. When every criterion passes — or he accepts the result as it
+is — the work of this conversation is done. The end is mandatory: an agent
+that always finds one more thing to propose drags the conversation out of
+the spec and in circles.
+
+**Clean-up first, still inside the run.** Launch one sub-agent, Opus
+medium, with the project root, the spec, the main branch, and the
+branches, worktrees and files this conversation created. Its job: leave
+the repository as clean as if the work had been done in one go.
+- Delete the local branches of this work already merged (`git branch -d`,
+  which refuses unmerged ones), the leftover worktrees, the temporary
+  files, probes, logs and scratch files.
+- Remove what the merged change made useless — dead code, replaced files,
+  scripts and docs about behaviour that no longer exists — in one local
+  commit, so it can be undone.
+- Run the project tests afterwards; put back any removal that breaks them.
+- Keep the spec file — it records his criteria and decisions — and any
+  uncommitted work of his.
+- What cannot be undone waits for his yes (Always): remote branches,
+  unmerged branches, untracked files this work did not create, anything
+  outside the project. The agent lists them and touches none.
+
+**Then the last reply marks the end**, verdict first: « La spec est
+terminée. » Then the result (§2), the criteria checked off, one line on
+the clean-up. Points outside the scope noticed on the way: one line each,
+as material for another conversation — never as options. Close with
+« Pour un autre sujet, ouvre une nouvelle conversation. » If part of the
+clean-up needs his yes, one lettered question on that alone comes last.
+Nothing else: no next step, no « on pourrait aussi », no new proposal.
+
+**After the end**, a message from him:
+- about this spec — a criterion he finds unmet, a fix to what was
+  delivered: still this spec; handle it, critics re-check, end again;
+- his answer on the clean-up: apply it, one line, end;
+- a new subject: one line — outside this spec, to open in a new
+  conversation with /spec-first. Do not start it here.
+
+Good: « La spec est terminée. Les 4 critères passent, vérifiés par les
+critiques. Nettoyage fait : 3 branches fusionnées et 2 fichiers devenus
+inutiles supprimés. Pour un autre sujet, ouvre une nouvelle conversation.
+Une branche reste sur GitHub : A la supprimer, B la garder. Je recommande
+A. Ton choix ? »
+Bad: « C'est fait ! Prochaines étapes possibles : A … B … C … »
 
 ## Always, even with full autonomy
 
@@ -276,6 +327,6 @@ tool, same models and efforts, the three critics launched in one message.
   declared session mode holds until he lifts it.
 - Genuinely ambiguous instruction: do not guess, do not stall. Lettered
   options — mid-run, only if the ambiguity blocks the remaining work.
-- Safety or security problem outside the scope: raise it as an option,
-  never act on it unilaterally — even a good fix outside the spec
-  re-decides his scope for him.
+- Safety or security problem outside the scope: flag it first in your
+  next report, never act on it unilaterally — even a good fix outside the
+  spec re-decides his scope for him. Fixing it is a new spec.
