@@ -12,9 +12,8 @@ description: >-
   session, until the user says to stop.
 disable-model-invocation: true
 allowed-tools:
-  - Workflow(spec-first:run)
+  - Workflow
   - Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/keep-waiting.sh" *)
-  - Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/repo-state.sh" *)
 ---
 
 # Spec-first — he owns the what, you own the how
@@ -196,17 +195,33 @@ choix ? »
 ## 7. Orchestrate the run
 
 During the run you are the orchestrator: you neither write the code nor
-judge it. Sub-agents do, each on the model and effort its role needs —
-the cheapest one that does the job well.
+judge it — sub-agents do. Your job: cut the work into everything that can
+run at the same time, and give each piece the right model. Maximum
+parallelism, through the Workflow tool: a workflow fans a phase out;
+chain several when a phase needs the previous one's result. To write your
+own, load the workflow-authoring skill first.
 
-| Role | Model | Why |
-|---|---|---|
-| Developer | Opus medium, then high, then xhigh | One tier up after each rejection by the critics |
-| Critics: a panel of three | Opus, one tier above the developer: high, then xhigh | Sharper than the author, without overspending on easy criteria |
-| Fusion of work done in parallel | Opus high | Conflicts need judgment, not depth |
-| Final check on the integrated result | Opus, one tier above the highest developer effort | Same panel, on everything at once |
+Your models — per job, the cheapest that does it well:
+- **Haiku medium or high**: fast and nearly free — fifty cost less than
+  one Opus. For wide, simple jobs: research across the codebase, facts
+  to gather, one plain rule to check on many items. Shallow: it misses
+  subtle defects. Never let it judge a criterion or write code that
+  matters; one Opus aggregates what the Haikus bring back.
+- **Opus medium**: the default for real work — developing, analysing,
+  aggregating. Better and cheaper per task than any Sonnet.
+- **Opus high, then xhigh**: sharper reading — critics, fusion, hard
+  problems; one tier up after each failure.
+- Never Opus max (his call alone), never Fable.
 
-Never Opus max (his call alone), never Fable.
+Whatever the workflow, ready-made or yours, the result is judged the
+same way:
+
+| Role | Model |
+|---|---|
+| Developer | Opus medium, then high, then xhigh — one tier up after each rejection |
+| Critics: a panel of three | Opus, one tier above the developer: high, then xhigh |
+| Fusion of work done in parallel | Opus high |
+| Final check on the integrated result | Opus, one tier above the highest developer effort |
 
 The three critics judge each criterion without seeing each other:
 - **testeur** — runs the real result and tries to break the criterion;
@@ -218,18 +233,24 @@ The three critics judge each criterion without seeing each other:
 A criterion passes only when the tester verified it on the real result
 and no critic proved a defect. A defect without a reproduction is not one.
 
-**How.** Right after his go, with the criteria numbered in the spec, run
-`bash "${CLAUDE_PLUGIN_ROOT}/scripts/repo-state.sh" <projectRoot>
-<your primary working directory>`, then call `Workflow({name:
-"spec-first:run", args: {specPath, projectRoot, criteria: [{id, text}],
-repo, groups, testCommand}})` with absolute paths: `repo` is the script's
-JSON output, verbatim; `groups` lists every criterion id once, criteria
-that may touch the same files in the same group — you know the code from
-writing the spec; omit it and one developer takes them all;
-`testCommand` runs the project tests from its root, omit it if none. The
-workflow runs independent groups in parallel in isolated copies when the
-repository is clean, merges them, then runs the final check. It runs in the background: hold your turn (§4) until it returns.
-Then:
+**The ready-made workflow** `spec-first:run` does all of it for a spec:
+developers, critics, escalation, fusion, final check. Right after his go,
+call `Workflow({name: "spec-first:run", args: {specPath, projectRoot,
+criteria: [{id, text}], groups, testCommand}})` with absolute paths and
+the criteria numbered as in the spec:
+- `groups`: every criterion id once; criteria that may touch the same
+  files share a group. Each group gets its own developer in an isolated
+  copy of the project, all at once, then merged — cut as fine as the code
+  allows. Omitted: one developer takes everything.
+- `parallel: false` when isolated copies cannot work — project not under
+  git, uncommitted changes, session outside the project: groups then run
+  one after the other in the project itself.
+- `testCommand`: runs the project tests from its root; omit it if none.
+
+Use it as is, or surround it with your own workflows when the spec calls
+for it — e.g. a codebase-wide research fanned out to Haikus before the
+developers start. Workflows run in the background: hold your turn (§4)
+until each returns. Then:
 - tick each « validé » criterion in the spec, add « Décisions prises
   pendant le run », and deliver the result (§2);
 - « non vérifié »: say what is missing to check it — never « terminé »;

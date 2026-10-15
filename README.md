@@ -22,9 +22,13 @@ stop.
 
 ## The run
 
-The skill calls the plugin's workflow `spec-first:run`
-(`workflows/run.js`). Each role runs on the cheapest model that does it
-well:
+During the run the main agent is an orchestrator: it cuts the work into
+what can run at the same time and fans it out through the Workflow tool,
+picking each sub-agent's model per job — Haiku medium/high for wide cheap
+sweeps (aggregated by one Opus), Opus medium for real work, Opus high and
+xhigh for critics and hard problems. Never Opus max, never Fable.
+
+Every result is judged the same way:
 
 | Role | Model |
 |---|---|
@@ -35,11 +39,14 @@ well:
 
 A criterion passes only when the tester verified it on the real result
 and no critic proved a defect. Three rejected rounds on a criterion stop
-the run and go back to the owner. Groups run in parallel only on a clean
-git repository the session runs in; otherwise one after the other in the
-project itself.
+the run and go back to the owner.
 
-`scripts/keep-waiting.sh` keeps the main agent's turn open while the
+The plugin ships a ready-made workflow, `spec-first:run`
+(`workflows/run.js`), that does all of it for a spec: groups run at once
+in isolated copies, then are merged. When isolated copies cannot work
+(`parallel: false`, or a developer finds its copy unusable), groups run
+one after the other in the project itself. The orchestrator may wrap it
+in workflows of its own.
+
+`scripts/keep-waiting.sh` keeps the main agent's turn open while a
 workflow runs in the background, so a wait never ends the run.
-`scripts/repo-state.sh` reads the repository state the workflow needs
-(clean tree, base commit, untracked files) without spending an agent.

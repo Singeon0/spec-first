@@ -1,7 +1,7 @@
 export const meta = {
   name: 'run',
   description: 'spec-first autonomous run: one developer per group of independent criteria, three-critic panel one effort tier above the developer, effort escalation, fusion, final check of every criterion',
-  whenToUse: 'Called by the spec-first skill after the owner gave his go on a spec. args: { specPath, projectRoot, criteria: [{ id, text }], repo: <JSON printed by scripts/repo-state.sh>, groups?: [[ids]], testCommand? } with absolute paths. Not for a bare slash-command call without args: tell the user to run /spec-first instead.',
+  whenToUse: 'Called by the spec-first skill after the owner gave his go on a spec. args: { specPath, projectRoot, criteria: [{ id, text }], groups?: [[ids]], testCommand?, parallel? } with absolute paths; parallel: false when isolated git worktrees cannot work (no git, uncommitted changes, session outside the project). Not for a bare slash-command call without args: tell the user to run /spec-first instead.',
   phases: [
     { title: 'Développement', detail: 'opus, one developer per group of criteria; medium, then high, then xhigh after each rejection' },
     { title: 'Critique', detail: 'opus, one tier above the developer (high, then xhigh): tester, owner and maintainer judge each criterion blind to each other' },
@@ -33,18 +33,6 @@ const CRITERIA = input.criteria.map((c, i) =>
   typeof c === 'string' ? { id: String(i + 1), text: c } : { id: String(c.id != null ? c.id : i + 1), text: String(c.text || '') })
 const byId = Object.fromEntries(CRITERIA.map(c => [c.id, c]))
 
-let repo = input.repo
-if (typeof repo === 'string') {
-  try { repo = JSON.parse(repo) } catch (e) { repo = null }
-}
-if (!repo || typeof repo.isRepo !== 'boolean') {
-  return { error: 'Missing args.repo. Run scripts/repo-state.sh <projectRoot> <your primary working directory> and pass its JSON output verbatim as repo.' }
-}
-const git = {
-  isRepo: repo.isRepo, clean: repo.clean === true, head: String(repo.head || ''), baseline: String(repo.baseline || ''),
-  cwdTopLevel: String(repo.cwdTopLevel || ''), rootTopLevel: String(repo.rootTopLevel || ''),
-  untrackedAtStart: Array.isArray(repo.untrackedAtStart) ? repo.untrackedAtStart.map(String) : [],
-}
 const testCommand = String(input.testCommand || '')
 
 // Groups come from the orchestrator: criteria that may touch the same files share a group
@@ -72,6 +60,7 @@ const DEV_SCHEMA = {
     workspace: { type: 'string', description: 'absolute path of the tree you worked in (`git rev-parse --show-toplevel`, or the project root if not a repo)' },
     branch: { type: 'string', description: 'current branch of that tree, empty if not a repo' },
     changed: { type: 'boolean', description: 'true if you modified or created any file' },
+    files: { type: 'array', items: { type: 'string' }, description: 'every file you created, modified or deleted in this round, relative to your workspace' },
     summary: { type: 'string', description: 'what the result now does, in two or three sentences' },
     selfCheck: {
       type: 'array',
@@ -88,7 +77,7 @@ const DEV_SCHEMA = {
     decisions: { type: 'array', items: { type: 'string' }, description: 'choices the spec did not settle that change what the owner can see or use, one short sentence each, in French, in plain words (what the result does, not how; no file or library names). Not what you did not do. Usually empty.' },
     blocker: { type: 'string', description: 'empty unless the spec itself must change or the owner must decide before any progress is possible' },
   },
-  required: ['workspace', 'branch', 'changed', 'summary', 'selfCheck', 'decisions', 'blocker'],
+  required: ['workspace', 'branch', 'changed', 'files', 'summary', 'selfCheck', 'decisions', 'blocker'],
 }
 
 const PANEL_SCHEMA = {
@@ -233,18 +222,19 @@ function collectOutside({ reviews }, sink) {
   for (const r of reviews) for (const o of (r && r.outsideSpec) || []) sink.push(o)
 }
 
-// Parallel groups need isolated worktrees: only safe on a clean repo the session itself runs in.
-const sameRepo = git.isRepo && git.cwdTopLevel && git.cwdTopLevel === git.rootTopLevel
-const MODE = input.parallel !== false && GROUPS.length > 1 && git.isRepo && git.clean && git.head && sameRepo ? 'worktree' : 'shared'
-const BASE = MODE === 'worktree' ? git.head : (git.baseline || git.head)
+// Groups run in parallel, each in its own git worktree, unless the orchestrator passed parallel: false.
+// Each isolated developer first checks that its copy can serve; a group whose copy cannot reruns in the project itself.
+const MODE = input.parallel !== false && GROUPS.length > 1 ? 'worktree' : 'shared'
+const ISOLATION = 'ISOLATION:'
 log(`${CRITERIA.length} critère(s), ${GROUPS.length} groupe(s), ${MODE === 'worktree' ? 'en parallèle (copies isolées)' : 'l’un après l’autre dans le projet'}`)
-if (GROUPS.length > 1 && MODE === 'shared') {
-  log(`Pas de parallèle : ${!git.isRepo ? 'pas de dépôt git' : !git.clean ? 'modifications en cours dans le projet' : !git.head ? 'aucun commit dans le dépôt' : !sameRepo ? 'la session tourne hors du projet' : 'désactivé'}`)
-}
 
-const diffHint = git.isRepo
-  ? `Changes of this run: \`git -C <tree> diff ${BASE}\`${MODE === 'shared' && git.untrackedAtStart.length ? ` plus untracked files not in this start list: ${git.untrackedAtStart.slice(0, 50).join(', ')}` : ' plus new untracked files (`git ls-files --others --exclude-standard`)'}.`
-  : 'Not a git repository: compare against the developer summary and the file list below.'
+const runFiles = [] // every file the developers reported, relative to the project root
+function changesHint(tree, files) {
+  const shown = [...new Set(files)].slice(0, 80)
+  return tree !== ROOT
+    ? `Changes of this run: \`git -C ${tree} diff $(git -C ${ROOT} rev-parse HEAD)\` — this copy started from that commit and its new files are committed.`
+    : `Changes of this run: ${shown.length ? `these files, relative to ${ROOT}: ${shown.join(', ')} — and in them \`git -C ${ROOT} diff\`` : 'see the developer summary'}. The project may already have held uncommitted changes before the run: those are not this run's.`
+}
 
 // ================================================================= 2. per group: dev → panel → escalate
 const decisions = []
@@ -252,21 +242,23 @@ const outsideSpec = []
 const doneGroups = [] // shared mode: groups already run in the project itself
 let topEffort = DEV_EFFORTS[0] // highest developer effort reached in the run
 
-async function runGroup(g) {
+async function runGroup(g, mode) {
   const tag = `Groupe ${g.id}`
   const results = {}
+  const files = []
   let pending = g.criteria.slice()
-  let where = MODE === 'worktree' ? null : ROOT
+  let where = mode === 'worktree' ? null : ROOT
   let branch = ''
   let feedback = ''
   let blocker = ''
   for (let round = 0; round < DEV_EFFORTS.length && pending.length; round++) {
     const effort = DEV_EFFORTS[round]
     if (round > DEV_EFFORTS.indexOf(topEffort)) topEffort = effort
-    const isolated = MODE === 'worktree' && where === null
+    const isolated = mode === 'worktree' && where === null
     const workspaceRule = isolated
-      ? `You are in an isolated git worktree (your starting directory), separate from the other developers. Work only there. When done, commit all your changes on the worktree's current branch (it is temporary: the fusion step brings it into the project and deletes it).`
-      : MODE === 'worktree' && where !== ROOT
+      ? `You are in an isolated git worktree (your starting directory), separate from the other developers. Before changing anything, check that this copy can serve: it belongs to the same repository as ${ROOT} (\`git rev-parse --git-common-dir\` and \`git -C ${ROOT} rev-parse --git-common-dir\` resolve to the same directory), ${ROOT} has no uncommitted change to tracked files (\`git -C ${ROOT} status --porcelain --untracked-files=no\` prints nothing), and no untracked file of ${ROOT} matters to your criteria. If a check fails, change nothing and return a blocker starting with "${ISOLATION}" and the reason in a few French words.
+Otherwise work only in this copy. When done, commit all your changes on the worktree's current branch (it is temporary: the fusion step brings it into the project and deletes it).`
+      : mode === 'worktree' && where !== ROOT
         ? `Your workspace is the git worktree ${where} (branch ${branch}). Every file you read or edit must be under ${where} — not under ${ROOT}. cd there first. When done, commit your changes on that branch.`
         : `Work directly in the project at ${ROOT}. Do not commit unless CLAUDE.md asks for it.`
     const devPrompt = `You are the developer for part of a spec, round ${round + 1} of at most ${DEV_EFFORTS.length}.
@@ -293,10 +285,14 @@ ${COMMON_RULES}`
       pending = []
       break
     }
+    if (isolated && !dev.changed && String(dev.blocker || '').startsWith(ISOLATION)) {
+      return { group: g.id, retryShared: dev.blocker.slice(ISOLATION.length).trim() || 'copie isolée inutilisable' }
+    }
     if (isolated) {
       where = dev.changed && dev.workspace ? dev.workspace.replace(/\/+$/, '') : ROOT
       branch = dev.changed ? dev.branch : ''
     }
+    for (const f of dev.files || []) { files.push(f); runFiles.push(f) }
     for (const d of dev.decisions || []) decisions.push(d)
     if (dev.blocker && !dev.changed) {
       blocker = dev.blocker
@@ -304,10 +300,10 @@ ${COMMON_RULES}`
       pending = []
       break
     }
-    const others = MODE === 'shared' ? doneGroups : []
+    const others = mode === 'shared' ? doneGroups : []
     const context = `${others.length ? `Earlier groups of this run already changed the project for other criteria — those changes are not yours to judge, not defects and not outside-spec issues: criteria ${others.map(o => o.criteria.map(c => c.id).join(', ')).join('; ')}.\n` : ''}Developer's summary (a claim, not evidence): ${dev.summary}
 Developer's self-check (a claim, not evidence): ${(dev.selfCheck || []).map(s => `[${s.id}] ${s.status}: ${s.evidence}`).join(' | ')}
-${diffHint.replace('<tree>', where)}${testCommand ? `\nProject tests: \`${testCommand}\` (run from ${where}).` : ''}`
+${changesHint(where, files)}${testCommand ? `\nProject tests: \`${testCommand}\` (run from ${where}).` : ''}`
     const reviews = await panel(pending, where, context, 'Critique', `${tag} — critique essai ${round + 1}`, criticEffort(effort))
     collectOutside(reviews, outsideSpec)
     const rejected = []
@@ -330,10 +326,15 @@ ${diffHint.replace('<tree>', where)}${testCommand ? `\nProject tests: \`${testCo
 
 let groupResults
 if (MODE === 'worktree') {
-  groupResults = await parallel(GROUPS.map(g => () => runGroup(g)))
+  groupResults = await parallel(GROUPS.map(g => () => runGroup(g, 'worktree')))
+  const retry = GROUPS.filter((g, i) => groupResults[i] && groupResults[i].retryShared)
+  if (retry.length) {
+    log(`Copie isolée impossible (${groupResults.find(r => r && r.retryShared).retryShared}) : ${retry.length} groupe(s) repris l’un après l’autre dans le projet`)
+    for (const g of retry) groupResults[GROUPS.indexOf(g)] = await runGroup(g, 'shared')
+  }
 } else {
   groupResults = []
-  for (const g of GROUPS) groupResults.push(await runGroup(g))
+  for (const g of GROUPS) groupResults.push(await runGroup(g, 'shared'))
 }
 groupResults = groupResults.map((r, i) => r || {
   group: GROUPS[i].id, criteria: GROUPS[i].criteria.map(c => c.id), where: null, branch: '', blocker: '',
@@ -346,10 +347,10 @@ for (const r of groupResults) Object.assign(status, r.results)
 // ================================================================= 3. fusion (isolated groups only)
 let fusion = null
 if (MODE === 'worktree') {
-  phase('Fusion')
   const toMerge = groupResults.filter(r => r.where && r.where !== ROOT && r.branch)
   if (toMerge.length) {
-    fusion = await call(`You are the integrator. Several developers worked in parallel, each in its own git worktree, all starting from commit ${BASE} of the project at ${ROOT}. Bring all their work into the working tree of ${ROOT}.
+    phase('Fusion')
+    fusion = await call(`You are the integrator. Several developers worked in parallel, each in its own git worktree, all starting from the current HEAD commit of the project at ${ROOT}. Bring all their work into the working tree of ${ROOT}.
 
 Spec: ${SPEC}
 Groups to integrate:
@@ -357,7 +358,7 @@ ${toMerge.map(r => `- group ${r.group}: branch ${r.branch}, worktree ${r.where},
 Criteria text:
 ${list(CRITERIA)}
 
-1. For each branch, apply its changes since ${BASE} to the working tree of ${ROOT} without committing (e.g. \`git -C ${ROOT} cherry-pick --no-commit ${BASE}..<branch>\`, or \`git diff ${BASE} <branch> | git -C ${ROOT} apply --3way\`). Resolve every conflict so that each group's criteria still hold: read both sides and keep both intents.
+1. For each branch, apply its changes since that HEAD to the working tree of ${ROOT} without committing (e.g. \`git -C ${ROOT} cherry-pick --no-commit HEAD..<branch>\`, or \`git -C ${ROOT} diff HEAD <branch> | git -C ${ROOT} apply --3way\`). The working tree of ${ROOT} may already hold changes of groups that ran in it during this run: keep them. Resolve every conflict so that each group's criteria still hold: read both sides and keep both intents.
 2. Run the project tests${testCommand ? ` (\`${testCommand}\`)` : ''} from ${ROOT} and fix what the integration broke — only that.
 3. Clean up only what this run created: \`git worktree remove\` each worktree listed above and delete each listed branch. Leave ${ROOT} with uncommitted changes; do not commit.
 
@@ -374,11 +375,11 @@ const finalIds = CRITERIA.filter(c => ['validated', 'unverified'].includes((stat
 if (needFinal && finalIds.length) {
   phase('Contrôle final')
   const ctx = `This is the final check on the integrated project: several groups of criteria were developed separately${fusion ? ' and merged' : ''}; each passed its own review. Look for what the combination broke.
-${diffHint.replace('<tree>', ROOT)}${testCommand ? `\nProject tests: \`${testCommand}\`.` : ''}`
+${changesHint(ROOT, runFiles)}${testCommand ? `\nProject tests: \`${testCommand}\`.` : ''}`
   const finalCriteria = finalIds.map(id => byId[id])
   // Groups merged from isolated copies need the full panel; groups run one after the
   // other in the project already saw each other's work, so only regressions remain: the tester.
-  const finalPanel = MODE === 'worktree' ? PERSONAS : PERSONAS.filter(p => p.key === 'tester')
+  const finalPanel = fusion ? PERSONAS : PERSONAS.filter(p => p.key === 'tester')
   const reviews = await panel(finalCriteria, ROOT, ctx, 'Contrôle final', 'Contrôle final', criticEffort(topEffort), finalPanel)
   collectOutside(reviews, outsideSpec)
   const broken = finalCriteria.filter(c => judge(c, reviews).status === 'defect')
@@ -429,7 +430,7 @@ for (const c of CRITERIA) counts[(status[c.id] || { status: 'failed' }).status] 
 log(`Fin : ${counts.validated}/${CRITERIA.length} validé(s), ${counts.unverified} non vérifié(s), ${counts.failed} en échec, ${counts.blocked} bloqué(s)`)
 
 return {
-  mode: MODE,
+  mode: groupResults.some(r => r.where && r.where !== ROOT) ? 'worktree' : 'shared',
   groups: GROUPS.map(g => ({ id: g.id, criteria: g.criteria.map(c => c.id) })),
   criteria: CRITERIA.map(c => ({ id: c.id, text: c.text, ...(status[c.id] || { status: 'failed', reason: 'never reviewed' }) })),
   counts,
