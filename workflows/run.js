@@ -1,11 +1,11 @@
 export const meta = {
   name: 'run',
-  description: 'spec-first autonomous run: one developer per group of independent criteria, three-critic panel one effort tier above the developer, effort escalation, fusion, final check of every criterion',
+  description: 'spec-first autonomous run: one developer per group of independent criteria, three-critic panel one effort tier above the developer, effort escalation, fusion, final check of every criterion when groups were merged or the code reworked',
   whenToUse: 'Called by the spec-first skill after the owner gave his go on a spec. args: { specPath, projectRoot, baseCommit, criteria: [{ id, text }], groups?: [[ids]], testCommand?, setupCommand? } with absolute paths. Groups always run at once, each developer in a git worktree it creates under <projectRoot>/.claude/worktrees from baseCommit, whatever the branch. projectRoot must be the top of a git repository with nothing uncommitted but the spec file: the skill makes it so before launching. Not for a bare slash-command call without args: tell the user to run /spec-first instead.',
   phases: [
     { title: 'Développement', detail: 'opus, one developer per group of criteria; medium, then high, then xhigh after each rejection' },
     { title: 'Critique', detail: 'opus, one tier above the developer (high, then xhigh): tester, owner and maintainer judge each criterion blind to each other' },
-    { title: 'Fusion', detail: 'opus high: integrates the isolated groups into the project tree' },
+    { title: 'Fusion', detail: 'opus high: brings the judged work of each group with a passing criterion into the project tree, committed or not; copies stay until the end of the spec' },
     { title: 'Contrôle final', detail: 'opus, one tier above the highest developer effort: the panel re-checks every criterion on the merged or reworked result; one opus xhigh repair if something broke' },
   ],
 }
@@ -100,21 +100,26 @@ const devSchema = ids => ({
   required: ['workspace', 'branch', 'changed', 'files', 'summary', 'selfCheck', 'decisions', 'blocker'],
 })
 
+// Verdicts are keyed by criterion id and every id is required: a critic cannot skip a criterion.
+const VERDICT = {
+  type: 'object',
+  properties: {
+    verdict: { type: 'string', enum: ['pass', 'defect', 'unverifiable'] },
+    proof: { type: 'string', description: 'what you ran or read and what you observed; for a defect, the reproduction' },
+    note: { type: 'string', description: 'a suspicion or an edge case you could not prove: a lead for the developer, never a defect' },
+  },
+  required: ['verdict', 'proof'],
+}
+
 const panelSchema = ids => ({
   type: 'object',
   properties: {
     verdicts: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          id: { type: 'string', enum: ids },
-          verdict: { type: 'string', enum: ['pass', 'defect', 'unverifiable'] },
-          proof: { type: 'string', description: 'what you ran or read and what you observed; for a defect, the reproduction' },
-          note: { type: 'string', description: 'a suspicion or an edge case you could not prove: a lead for the developer, never a defect' },
-        },
-        required: ['id', 'verdict', 'proof'],
-      },
+      type: 'object',
+      description: 'one verdict per criterion, keyed by its id',
+      properties: Object.fromEntries(ids.map(id => [id, VERDICT])),
+      required: ids,
+      additionalProperties: false,
     },
     outsideSpec: {
       type: 'array',
@@ -142,9 +147,8 @@ const fusionSchema = ids => ({
     notIntegrated: { type: 'array', items: { type: 'object', properties: { group: { type: 'string', enum: ids }, reason: { type: 'string' } }, required: ['group', 'reason'] } },
     conflicts: { type: 'array', items: { type: 'string' }, description: 'each conflict and how it was resolved, in plain words' },
     tests: { type: 'string', description: 'test command run and its outcome' },
-    cleanedUp: { type: 'boolean', description: 'true if the worktree and branch of every integrated group are gone' },
   },
-  required: ['integrated', 'notIntegrated', 'conflicts', 'tests', 'cleanedUp'],
+  required: ['integrated', 'notIntegrated', 'conflicts', 'tests'],
 })
 
 const REPAIR_SCHEMA = {
@@ -180,7 +184,7 @@ const PERSONAS = [
   {
     key: 'tester',
     label: 'testeur',
-    brief: `You are the TESTER. Run the real result and try to break each criterion: the main path, then edge cases, bad input, empty and boundary values, the exact wording of the criterion. Build it, run it, call it, open it — whatever the criterion's "observable" means. "pass" means you exercised the criterion on the real result and it held; reading code is not enough for "pass". If you cannot run it here (needs a device, a human eye, a credential), the verdict is "unverifiable" and the proof says what is missing.`,
+    brief: `You are the TESTER. Run the real result and try to break each criterion: the main path, then edge cases, bad input, empty and boundary values, the exact wording of the criterion. Build it, run it, call it, open it — whatever the criterion's "observable" means. "pass" means you exercised the criterion on the real result and it held; reading code is not enough for "pass". Visual or interactive criteria: check them on screen, as the owner would, with the screenshot and browser tools you have (load them with ToolSearch if they are deferred). "unverifiable" only when a device or a credential is missing — the proof names it.`,
   },
   {
     key: 'owner',
@@ -215,7 +219,7 @@ ${tests}
 Do not edit source files under ${ROOT} or ${where}. Build outputs, caches and servers the project's own commands create are fine. Scratch files go in a fresh \`mktemp -d\` directory only.
 ${portRule(slot)}
 
-For each criterion above, one verdict, with its id exactly as given:
+One verdict per criterion above, keyed by its id:
 - "pass": you checked it and it holds — proof says what you ran or read and what you saw;
 - "defect": you PROVED it fails — proof is the reproduction (exact command and observed output, or the concrete input and the wrong behaviour). A suspicion you cannot prove is not a defect: put it in "note" — the developer gets it as a lead;
 - "unverifiable": you could not check it — proof says why.
@@ -235,7 +239,7 @@ async function panel(criteria, where, context, phaseTitle, tag, effort, slot0) {
 function judge(c, reviews) {
   const got = PERSONAS.map((p, i) => {
     const r = reviews[i]
-    const v = r && Array.isArray(r.verdicts) ? r.verdicts.find(x => String(x.id) === c.id) : null
+    const v = r && r.verdicts && typeof r.verdicts === 'object' ? r.verdicts[c.id] || null : null
     return { persona: p.key, v }
   })
   const leads = got.filter(g => g.v && String(g.v.note || '').trim()).map(g => `[${g.persona}] ${g.v.note}`)
@@ -280,7 +284,7 @@ Otherwise create your copy from commit ${BASE}, whatever the branch:
 \`cd "${ROOT}" && x=$(git rev-parse --git-path info/exclude) && mkdir -p "$(dirname "$x")" .claude/worktrees && { grep -qxF /.claude/worktrees/ "$x" || echo /.claude/worktrees/ >> "$x"; } && d=$(mktemp -d .claude/worktrees/g${g.id}-XXXXXX) && git worktree add -b "spec-first-$(basename "$d")" "$d/wt" ${BASE} && cd "$d/wt" && pwd\`
 Work only in that copy: every file you edit must be under it, never under ${ROOT}. Read the spec at ${SPEC}: your copy may lack it or hold an older version.
 A copy holds tracked files only. ${prepare} Never commit those files.
-When done, commit all your changes on that branch (it is temporary: the fusion brings it into the project, then deletes it). ${HOOK_RULE} Return that copy as workspace and its branch as branch, even if you changed nothing. These checks and this copy are plumbing: never mention them in decisions.`
+When done, commit all your changes on that branch (it is temporary: the fusion brings your work into the project; the copy is removed at the end of the spec). ${HOOK_RULE} Return that copy as workspace and its branch as branch, even if you changed nothing. These checks and this copy are plumbing: never mention them in decisions.`
 }
 
 async function runGroup(g, gi, mode) {
@@ -306,8 +310,8 @@ ${done.length ? `Already validated in this group — keep them working:\n${list(
 
 ${workspaceRule(g, mode, mode === 'worktree' ? where : ROOT, branch)}
 ${portRule(groupSlot(gi, round, 0))}
-${feedback}
-Before returning, check each of your criteria on the real result yourself (run it, run the relevant tests${testCommand ? ` — project tests: \`${testCommand}\`` : ''}) and report honestly in selfCheck: an independent panel will verify it.
+${feedback}${testCommand ? `\nProject tests: \`${testCommand}\`.` : ''}
+An independent panel judges every criterion on the real result.
 Never run commands that rewrite files outside your criteria (repo-wide formatters, lockfile upgrades). If you need a new dependency, add it the project's usual way and say so in your summary.
 "blocker" stays empty unless you cannot make any progress without the owner changing or clarifying the spec.
 
@@ -394,41 +398,57 @@ const status = {}
 for (const r of groupResults) Object.assign(status, r.results)
 
 // ================================================================= 2. fusion (several groups)
-// Only groups the integrator reports as integrated count; the others keep their copy and branch,
-// and their criteria are blocked: nothing is validated that is not in the project.
+// Only a group with a validated or unverified criterion is merged: a group whose criteria all failed
+// or were blocked brings nothing into the project. The fusion brings in exactly what the critics
+// judged — the copy's committed and uncommitted work — and deletes nothing: every copy stays until
+// the end of the spec (§8 of the skill), where only the integrated ones are removed. A criterion is
+// never validated if its work is not in the project.
 let fusion = null
 const integrated = new Set()
+const hasPassing = r => r.criteria.some(id => ['validated', 'unverified'].includes(status[id].status))
+const keepBlocked = (r, reason) => {
+  for (const id of r.criteria) {
+    if (['validated', 'unverified'].includes(status[id].status)) status[id] = { ...status[id], status: 'blocked', reason }
+  }
+}
 if (MODE === 'worktree') {
-  const toMerge = groupResults.filter(r => r.where && r.branch)
+  for (const r of groupResults) {
+    if (r.where && !r.branch && hasPassing(r)) keepBlocked(r, `Copie rendue sans nom de branche — travail conservé dans ${r.where}.`)
+  }
+  const toMerge = groupResults.filter(r => r.where && r.branch && hasPassing(r))
   if (toMerge.length) {
     phase('Fusion')
-    fusion = await agent(`You are the integrator. Several developers worked in parallel, each in its own git worktree made from commit ${BASE} of the project at ${ROOT}. Bring all their work into the working tree of ${ROOT}, without committing.
+    fusion = await agent(`You are the integrator. Several developers worked in parallel, each in its own git worktree made from commit ${BASE} of the project at ${ROOT}. Bring the work of the groups below into the working tree of ${ROOT}, without committing.
 
 Spec: ${SPEC}
 <groups>
-${toMerge.map(r => `- group ${r.group}: branch ${r.branch}, worktree ${r.where}, criteria ${r.criteria.join(', ')} (statuses: ${r.criteria.map(id => `${id}=${status[id].status}`).join(', ')})`).join('\n')}
+${toMerge.map(r => `- group ${r.group}: worktree ${r.where}, branch ${r.branch}, criteria ${r.criteria.join(', ')} (statuses: ${r.criteria.map(id => `${id}=${status[id].status}`).join(', ')})`).join('\n')}
 </groups>
 ${list(CRITERIA)}
 
-1. For each branch, apply its changes since ${BASE} to the working tree of ${ROOT} without committing (e.g. \`git -C ${ROOT} cherry-pick --no-commit ${BASE}..<branch>\`, or \`git -C ${ROOT} diff ${BASE} <branch> | git -C ${ROOT} apply --3way\`). Resolve every conflict so that each group's criteria still hold: read both sides and keep both intents. The uncommitted spec file stays as it is.
-2. If a group added a dependency, install it in the project the usual way. Then run the project tests${testCommand ? ` (\`${testCommand}\`)` : ''} from ${ROOT} and fix what the integration broke — only that.
-3. For each group you integrated, and only those: \`git -C ${ROOT} worktree remove --force <worktree>\`, \`git -C ${ROOT} branch -D <branch>\` (its changes are now in the project tree), then \`rmdir "$(dirname <worktree>)"\`. A group you could not integrate stays untouched — worktree and branch — and goes in notIntegrated with the reason.
+1. For each group, in the order listed, bring in its copy's work, committed or not — exactly what its critics judged:
+   - stage everything in the copy: \`git -C <worktree> add -A\`
+   - check the list (\`git -C <worktree> diff --cached --name-only ${BASE}\`) and unstage what is not the group's work — local config copied in (.env), dependency folders, caches, build outputs: \`git -C <worktree> restore --staged --source=${BASE} -- <path>\` (drops it even if the developer committed it)
+   - apply it: \`git -C <worktree> diff --cached --binary ${BASE} | git -C ${ROOT} apply --3way\` (empty diff → nothing to bring; the group counts as integrated)
+   - conflict → resolve the markers in ${ROOT} so every group's criteria still hold (read both sides, keep both intents), then \`git -C ${ROOT} add <file>\`, before the next group
+   Never run \`git checkout\`, \`reset\`, \`stash\` or \`cherry-pick\` in ${ROOT}: they can wipe the groups already brought in. The uncommitted spec file stays as it is.
+2. A group added a dependency → install it in the project the usual way. Then run the project tests${testCommand ? ` (\`${testCommand}\`)` : ''} from ${ROOT} and fix what the integration broke — only that.
+3. Leave every copy and branch in place — they are removed at the end of the spec, after the result is committed. A group you could not bring in goes in notIntegrated with the reason.
 Do not commit: the run's result is committed once, at the end of the spec.
 ${portRule(0)}
 
 ${COMMON_RULES}`, { ...FUSION, schema: fusionSchema(toMerge.map(r => String(r.group))), phase: 'Fusion', label: 'Fusion (opus high)' })
     const ok = new Set(((fusion && fusion.integrated) || []).map(String))
     for (const r of toMerge) {
-      if (ok.has(String(r.group))) { integrated.add(r.group); r.where = ''; r.branch = ''; continue }
-      const reason = `Non intégré au projet — travail conservé sur la branche ${r.branch}.`
-      for (const id of r.criteria) {
-        if (['validated', 'unverified'].includes(status[id].status)) status[id] = { ...status[id], status: 'blocked', reason }
-      }
+      if (ok.has(String(r.group))) integrated.add(r.group)
+      else keepBlocked(r, `Non intégré au projet — travail conservé sur la branche ${r.branch}.`)
     }
     log(fusion
       ? `Fusion : ${integrated.size}/${toMerge.length} groupe(s) intégré(s)`
-      : 'Fusion : l’agent n’a pas abouti — aucun groupe intégré, chaque travail reste sur sa branche')
+      : 'Fusion : l’agent n’a pas abouti — aucun groupe intégré, chaque travail reste dans sa copie')
   }
+  const skipped = groupResults.filter(r => r.where && !hasPassing(r) && !integrated.has(r.group)).length
+  if (skipped) log(`${skipped} groupe(s) sans critère validé : non fusionné(s), copie conservée`)
 }
 
 // ================================================================= 3. final check
@@ -441,7 +461,7 @@ const finalIds = CRITERIA.filter(c => ['validated', 'unverified'].includes((stat
 if (needFinal && finalIds.length) {
   phase('Contrôle final')
   const ctx = `${MODE === 'worktree'
-    ? `This is the final check on the merged project: ${integrated.size} group(s) of criteria were developed separately, each passed its own review, then they were merged. Look for what the combination broke.`
+    ? `This is the final check on the merged project: the validated work of ${integrated.size} group(s), developed separately, was merged. Look for what the combination broke.`
     : 'This is the final check: the developer reworked the code after a rejection, so criteria that passed in an earlier round may have broken. Look for regressions.'}
 ${changesHint(ROOT)}`
   const finalCriteria = finalIds.map(id => byId[id])
@@ -506,9 +526,9 @@ return {
   mode: MODE,
   baseCommit: BASE,
   groups: groupResults.map(r => ({ id: r.group, criteria: r.criteria, integrated: MODE === 'shared' || integrated.has(r.group) })),
-  // Copies and branches still on disk: work that was not merged. The clean-up never deletes them
-  // without the owner's yes.
-  leftovers: groupResults.filter(r => r.where || r.branch).map(r => ({ group: r.group, worktree: r.where, branch: r.branch })),
+  // Every copy this run made, still on disk. At the end of the spec the clean-up removes the
+  // integrated ones (their work is in the « spec » commit); the others wait for the owner's yes.
+  copies: groupResults.filter(r => r.where).map(r => ({ group: r.group, worktree: r.where, branch: r.branch, integrated: integrated.has(r.group) })),
   criteria: CRITERIA.map(c => ({ id: c.id, text: c.text, ...(status[c.id] || { status: 'failed', reason: 'never reviewed' }) })),
   counts,
   blockers: groupResults.filter(r => r.blocker).map(r => ({ group: r.group, question: r.blocker })),

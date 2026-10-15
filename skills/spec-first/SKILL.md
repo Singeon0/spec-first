@@ -89,10 +89,10 @@ No steps, technical choices or how — he approves an outcome, not a method. Cla
 - git repository top: `git rev-parse --show-toplevel` (project in a sub-folder → runs from that top)
 - nothing uncommitted but the spec: `git status --porcelain`
 - other changes in progress → one line in the go request; his go = his yes to commit them first, one local commit « travail en cours avant la spec <nom> »
-- not a git repository → same, announced the same way: `git init` + first commit
+- not a git repository → same, announced the same way: `git init` + a `.gitignore` for its dependency, build and cache folders + first commit
 - never stash or discard his changes
 - likely secret (`.env`, key, token) not in `.gitignore`, or binary > 10 MB → never committed unasked: A add it to `.gitignore`, B commit it anyway
-- run edits files unasked only in auto/bypass permission mode → another mode known to be on → one line in the go request
+- the launch and the run's edits go unasked only in auto/bypass permission mode → another mode known to be on → one line in the go request: each launch will ask for his approval
 
 **Go** = his go on this spec. Not a go: an earlier session's go, an ambiguous « ok » (false go → work he didn't choose). Small reversible task → one-sentence spec inline, zero questions.
 
@@ -125,7 +125,7 @@ Long run, before each reply → quick re-check: scope unchanged · verdict first
 **Right after his go → the goal.** End the launch turn's message with this line, filled in (real file name, real N), alone in a code block (one-gesture copy):
 
 ```
-/goal Le contrôle final de specs/<fichier>.md rapporte N/N critères validés et le nettoyage est fait, OU une seule question lettrée attend la décision du propriétaire (blocage ou changement de spec).
+/goal Le rapport du run de specs/<fichier>.md donne N/N critères validés par les critiques et le nettoyage est fait, OU une seule question lettrée attend la décision du propriétaire (blocage ou changement de spec).
 ```
 
 - one line before: « Colle cette ligne pour que le run aille au bout sans relance : » · nothing after · under 500 characters
@@ -161,24 +161,25 @@ Good: « Le skill GitLab échoue avec telle erreur. A : je réessaie via le skil
 You orchestrate: you neither write nor judge the code — sub-agents do. Your job: cut the work into everything that can run at once, the right model per piece. Maximum parallelism via the Workflow tool: a workflow fans a phase out; chain several when a phase needs the previous one's result. Writing your own → load the workflow-authoring skill first.
 
 **Models — per job, the cheapest that does it well**
-- **Haiku medium/high**: fast, nearly free (fifty cost less than one Opus) → wide simple jobs: codebase research, facts to gather, one plain rule checked on many items. Shallow, misses subtle defects → never judges a criterion or writes code that matters; one Opus aggregates its findings.
+- **Haiku medium/high**: fast, 20–40× cheaper than Opus per token (4–8× once its prompt exceeds 100k tokens) → wide simple jobs: codebase research, facts to gather, one plain rule checked on many items. Shallow, misses subtle defects → never judges a criterion or writes code that matters; one Opus aggregates its findings.
 - **Opus medium**: default for real work — developing, analysing, aggregating; better and cheaper per task than any Sonnet.
 - **Opus high → xhigh**: sharper reading — critics, fusion, hard problems; one tier up after each failure.
 - Never Opus max (his call alone), never Fable.
 - Every agent you launch: explicit model + effort (else it takes your session's, max included).
 
-**Judging — same in every workflow, ready-made or yours**
+**Judging — same in every workflow, ready-made or yours** (one exception: the one-sentence spec, below)
 
 ```
 developer ──→ 3 critics, blind to each other, judge each criterion ──→ all pass ✓
 Opus medium   Opus, one tier above the developer
    ↑                    │ rejected
    └── one tier up ─────┘   developer: medium → high → xhigh · critics: high → xhigh
-work done in parallel → fusion (Opus high)
-  → final check of every criterion on the integrated result (Opus, one tier above the highest developer effort)
+groups with a passing criterion → fusion (Opus high)
+merged or reworked → final check of every criterion on the integrated result (Opus, one tier above the highest developer effort)
+  └ something broke → one repair (Opus xhigh) → every criterion judged again
 ```
 
-- **testeur**: runs the real result, tries to break the criterion
+- **testeur**: runs the real result, tries to break the criterion; visual criteria → checked on screen with the screenshot and browser tools
 - **propriétaire**: checks it does what he meant, not a convenient reading of the words; contradicts none of his decisions
 - **mainteneur**: reads the changes — security, side effects, scope creep, existing tests
 - criterion passes = tester verified it on the real result + no critic proved a defect; a defect without a reproduction is not one
@@ -186,14 +187,16 @@ work done in parallel → fusion (Opus high)
 **`spec-first:run`** — ready-made: developers, critics, escalation, fusion, final check. Call right after his go (and the « travail en cours » commit, if any), absolute paths, criteria numbered as in the spec:
 `Workflow({name: "spec-first:run", args: {specPath, projectRoot, baseCommit, criteria: [{id, text}], groups, testCommand, setupCommand}})`
 - `projectRoot`: git repository top (§4) · `baseCommit`: `git rev-parse HEAD`, right before the call
-- `groups`: every criterion id once; criteria that may touch the same files share a group → each group: its own developer, all at once, in its own copy made from `baseCommit` inside the project (`.claude/worktrees/`, hidden from git), then merged · cut as fine as the code allows: one group per independent criterion · omitted → one developer takes everything, in the project itself · project clean (§4) → no sequential fallback
+- `groups`: every criterion id once; criteria that may touch the same files share a group → each group: its own developer, all at once, in its own copy made from `baseCommit` inside the project (`.claude/worktrees/`, hidden from git) → its judged work merged, committed or not; copies kept until the end (§8) · cut as fine as the code allows: one group per independent criterion · omitted → one developer takes everything, in the project itself · project clean (§4) → no sequential fallback
 - `testCommand`: runs the project tests from its root; omit if none
 - `setupCommand`: makes a fresh copy runnable (dependencies installed, local config copied from the project), e.g. `uv sync && cp <root>/.env .`; omit if a fresh checkout runs as is
+- another run in the same spec (a relaunch, a changed spec) → first commit the work so far, spec file aside, in one local commit « spec : <nom> (étape N) »; that commit = its `baseCommit` (copies start from it)
 
 Use as is, or surround with your own workflows when the spec calls for it (e.g. codebase-wide research fanned out to Haikus before the developers start). Workflows run in the background → wait (§4) until each returns. Then:
 - « validé » → tick it in the spec, add « Décisions prises pendant le run » → clean up and end (§8)
-- « non vérifié » → say what is missing to check it; never « terminé »
-- « en échec » after three rounds, or « bloqué » (a blocker, or work the fusion couldn't merge, kept on its branch: `leftovers`) → stop point (§4): the gap in his terms, options, your recommendation
+- « non vérifié » → never « terminé »: a critic did not return (« no verdict from … ») → judge it again with the Agent tool, same persona, model and effort; something only he can provide is missing (a device, a credential) → stop point « truly blocked » (§4)
+- « bloqué » by a blocker that is only the how (nothing for him to decide) → decide it, log it under « Décisions prises pendant le run », relaunch that criterion alone
+- « en échec » after three rounds, or « bloqué » for anything else (a blocker that needs him, or work not merged — its copy kept: `copies` with `integrated: false`) → stop point (§4): the gap in his terms, options, your recommendation
 - found beyond the spec (task wider than planned, neighbouring problem) → never added to this run → second spec (§8)
 
 One-sentence spec (small reversible task, §4) → no workflow: one Opus medium sub-agent does it, one Opus high tester checks it.
@@ -209,12 +212,13 @@ criteria pass → commit « spec : <nom> » → clean-up sub-agent → commit «
 
 **Commit, then clean up, still inside the run** — two local commits on the current branch, yours, never his:
 1. « spec : <nom> »: the result + the ticked spec; you make it.
-2. « nettoyage : <nom> »: one Opus medium sub-agent, given the project root, the spec, the « spec » commit, the run's `leftovers`, the files this conversation created. Job: repository as clean as if done in one go, in a commit that can be undone on its own:
-   - delete temporary files, probes, logs, scratch files, and any `spec-first-g*` worktree or branch not in `leftovers` (its work is in the « spec » commit)
+2. « nettoyage : <nom> »: one Opus medium sub-agent, given the project root, the spec, the « spec » commit, the `copies` of every run of this spec, the files this conversation created. Job: repository as clean as if done in one go, in a commit that can be undone on its own:
+   - remove this spec's `copies` with `integrated: true` — `git worktree remove --force`, `git branch -D`, then the empty folder (their work is in the « spec » commit)
+   - delete the temporary files, probes, logs and scratch files this conversation created
    - remove what the merged change made useless: dead code, replaced files, scripts and docs about behaviour that no longer exists
    - run the project tests afterwards; put back any removal that breaks them
    - keep the spec file (it records his criteria and decisions)
-   - what can't be undone → waits for his yes (Always): `leftovers` (work never merged), remote branches, other unmerged branches, untracked files this work didn't create, anything outside the project → listed, none touched
+   - what can't be undone → waits for his yes (Always): `copies` with `integrated: false` (work never merged), any other `spec-first-*` copy or branch (an earlier spec, a developer that stopped), remote branches, other unmerged branches, untracked files this work didn't create, anything outside the project → listed, none touched — except what he already decided to keep: left as is, not listed again
 
 Likely secret or binary > 10 MB → never committed unasked (§4).
 
@@ -239,7 +243,7 @@ Bad: « C'est fait ! Prochaines étapes possibles : A … B … C … »
 ## Always, even with full autonomy
 
 - Truly irreversible → his explicit confirmation: production data · deleting data he can't get back · force-push or rewriting shared history · anything sent outside the machine (push, deploy, publish, message). His risk, his call; granted autonomy never covers these.
-- Can be undone → yours, unasked: local edits, local commits and branches, the run's worktrees and temporary files, a process you started.
+- Can be undone → yours, unasked: local edits, local commits, new branches, the run's merged copies (`integrated: true`) and temporary files, a process you started. A copy never merged holds work found nowhere else → his yes.
 - Commits stay local, never rewritten: no amend, no rebase, never `--no-verify`. Commit hook fails → fix the cause if it lies in the run's files; otherwise stop point.
 - Shape he asks for in one message → that reply only. Declared session mode → until he lifts it.
 - Genuinely ambiguous instruction → don't guess, don't stall: lettered options (mid-run: only if it blocks the remaining work).

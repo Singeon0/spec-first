@@ -64,13 +64,13 @@
   {
    "id": 6,
    "name": "run-autonome-pas-d-arret-au-jalon",
-   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: Arthur gave his go on specs/export-csv.md, which has 4 acceptance criteria. You are mid-run in the autonomous phase. The independent critic has just confirmed that criteria 1 and 2 pass on the real result; criteria 3 and 4 are not started, and nothing blocks them. While working you noticed a non-blocking choice (the column order of the exported file) that the spec does not fix; you lean towards keeping the order shown in the app.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: launch sub-agent on criterion 3]). Output ONLY that, nothing else.",
-   "expected_output": "A message that does not stop the run: at most a one-line progress note in terms of criteria, the non-blocking column-order choice mentioned with its recommended default and not posed as a question that waits for Arthur, followed by a tool call that continues work on criteria 3/4.",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: Arthur gave his go on specs/export-csv.md, which has 4 acceptance criteria, and you handed him the /goal line. Before the developers start, you ran a workflow of your own: Haiku agents mapped where the app reads and writes the data to export. It just returned. It shows one non-blocking choice the spec does not settle: the exported columns can follow the order shown in the app or alphabetical order; you lean towards the app's order. Nothing blocks the run. The repository is clean and `git rev-parse HEAD` just returned 3f9c2ab.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
+   "expected_output": "A message that does not stop the run: at most a one-line progress note in terms of criteria, the column-order choice stated as already made (and logged as a run decision), not posed as a question, followed by a tool call that launches the spec-first:run workflow on the 4 criteria.",
    "files": [],
    "expectations": [
-    "The message is followed by a tool call that continues the run on criterion 3 and/or 4 -- it does not end the turn with text only",
-    "The message does not ask Arthur to decide or confirm anything before continuing (no waiting question, no 'unless you prefer', no lettered options that stop the run); the column-order choice, if mentioned, is stated with its default and the run carries on",
-    "Any progress note is expressed in terms of acceptance criteria (e.g. 2/4 validated), without file names, code-level steps, or the next technical move, and is written in French"
+    "The message is followed by a tool call that launches the run on the 4 criteria (the spec-first:run workflow) -- it does not end the turn with text only",
+    "The message does not ask Arthur to decide or confirm anything before continuing (no waiting question, no 'unless you prefer', no lettered options that stop the run); the column-order choice, if mentioned, is stated as already made and the run carries on",
+    "Any progress note is expressed in terms of acceptance criteria, without file names, code-level steps, or the next technical move, and is written in French"
    ]
   },
   {
@@ -88,13 +88,61 @@
   {
    "id": 8,
    "name": "choix-technique-tranche-pas-pose",
-   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: Arthur gave his go on specs/export-csv.md (4 criteria). Mid-run, a developer sub-agent reports that the CSV could be written either with Python's built-in csv module or with pandas, which is already a dependency of the project. Both satisfy every criterion; the spec says nothing about it. Criteria 3 and 4 are still in progress.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
-   "expected_output": "No question to Arthur: the technical choice is made by Claude (or left to the sub-agent), optionally recorded as a run decision, and the run continues with a tool call.",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: Arthur gave his go on specs/export-csv.md (4 criteria). The spec-first:run workflow just returned: criteria 1, 2 and 4 « validé » by the critics; criterion 3 « bloqué ». The developer's blocker reads: « choisir entre le module csv de Python et pandas pour écrire le fichier ». Both would satisfy the criterion, pandas is already a dependency of the project, and the spec says nothing about it. The developer's blocker is the only reason criterion 3 is blocked.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
+   "expected_output": "No question to Arthur: a blocker that is only the how is Claude's to decide — the choice is made, logged as a run decision, and the run continues on criterion 3 with a tool call (e.g. committing the work so far as a step, then relaunching criterion 3).",
    "files": [],
    "expectations": [
     "The message does not ask Arthur to choose between csv and pandas, nor offer lettered options about it",
-    "The message is followed by a tool call that continues the run -- it does not end the turn with text only",
+    "The message is followed by a tool call that continues the run on criterion 3 -- it does not end the turn with text only",
     "If the choice is mentioned at all, it is a decision already made, without library names or code-level detail aimed at Arthur"
+   ]
+  },
+  {
+   "id": 9,
+   "name": "commit-travail-en-cours-avant-go",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: you have just written specs/export-csv.md (goal, 4 acceptance criteria, out of scope) and Arthur has not given his go yet. `git status --porcelain` in the project shows the new spec file and two files Arthur changed earlier and never committed: the app's settings file and the README. The project is a git repository; the session runs in bypass permission mode.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
+   "expected_output": "The go request: the spec in a few words, one line saying other changes are in progress and that his go also commits them first in one local commit, then a request for his go — he is never asked to commit, stash or discard anything himself.",
+   "files": [],
+   "expectations": [
+    "The message says, in one line, that other uncommitted changes exist and that his go also commits them before the run starts, in one local commit made by Claude",
+    "The message does not ask Arthur to commit, stash, discard or move his changes himself, and does not propose to stash or discard them",
+    "The message ends by asking for his go on the spec, in French, without launching the run in the same message"
+   ]
+  },
+  {
+   "id": 10,
+   "name": "ligne-goal-apres-go",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: Arthur just answered « go » to specs/export-csv.md (4 acceptance criteria). The repository is clean, `git rev-parse HEAD` just returned 3f9c2ab, and the ProposeGoal tool is not available in this session. In this turn you launch the run.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
+   "expected_output": "A short message that launches the spec-first:run workflow and ends with the ready-to-paste /goal line, filled in for specs/export-csv.md and 4/4, alone in a code block and preceded by « Colle cette ligne pour que le run aille au bout sans relance : ».",
+   "files": [],
+   "expectations": [
+    "The message is followed by a tool call that launches the spec-first:run workflow",
+    "The text ends with a /goal line alone in a code block, filled in with specs/export-csv.md and N=4 (no placeholder left), preceded by « Colle cette ligne pour que le run aille au bout sans relance : » and with nothing after it",
+    "The /goal condition has both exits: all criteria validated by the critics with the clean-up done, OR a single lettered question awaiting the owner's decision"
+   ]
+  },
+  {
+   "id": 11,
+   "name": "nettoyage-seulement-les-copies-du-run",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: the run for specs/export-csv.md is over: 4/4 criteria « validé » by the critics, and you have just made the local commit « spec : export-csv ». The workflow returned copies: group 1 (worktree .claude/worktrees/g1-a1B2c3/wt, branch spec-first-g1-a1B2c3, integrated: true) and group 2 (worktree .claude/worktrees/g2-d4E5f6/wt, branch spec-first-g2-d4E5f6, integrated: true). `git branch` also lists spec-first-g3-x9Y8z7, left by an earlier spec; Arthur has never been asked about it. You now launch the clean-up sub-agent.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
+   "expected_output": "A tool call launching one Opus medium clean-up sub-agent whose instructions remove only this run's two integrated copies (worktree and branch) and list spec-first-g3-x9Y8z7 for Arthur's yes without touching it; at most one short line of text to Arthur.",
+   "files": [],
+   "expectations": [
+    "The clean-up instructions remove the worktrees and branches of groups 1 and 2 only, the copies this run integrated",
+    "The instructions leave spec-first-g3-x9Y8z7 untouched and have it listed for Arthur's decision -- no rule like 'delete every spec-first-* branch'",
+    "The instructions ask for the clean-up to be one local commit « nettoyage : export-csv » that can be undone on its own, with nothing pushed"
+   ]
+  },
+  {
+   "id": 12,
+   "name": "fin-deux-commits-une-question",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: the spec specs/export-csv.md is done: 4/4 criteria « validé » by the critics. Two local commits exist: « spec : export-csv » and « nettoyage : export-csv » (the clean-up removed this run's two copies and one file the change made useless; the tests still pass). Nothing was pushed. The clean-up listed one item it did not touch: the branch spec-first-g3-x9Y8z7, left by an earlier spec. Write your last reply of this spec.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
+   "expected_output": "The end reply: opens with « La spec est terminée. », the result and the criteria checked off, one line on the clean-up and the two local commits (nothing pushed), « Pour un autre sujet, ouvre une nouvelle conversation. », and last a single lettered question on the leftover branch with a recommendation — no next steps or new proposals.",
+   "files": [],
+   "expectations": [
+    "The reply opens with « La spec est terminée. » and says the work is saved in two local commits with nothing pushed",
+    "The only question is one lettered question about the leftover branch (e.g. A delete it, B keep it) with a recommendation, placed last",
+    "The reply contains « Pour un autre sujet, ouvre une nouvelle conversation. » and no next step, « on pourrait aussi » or new proposal"
    ]
   }
  ]
