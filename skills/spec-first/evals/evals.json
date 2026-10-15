@@ -77,10 +77,10 @@
    "id": 7,
    "name": "attente-workflow-pas-d-arret",
    "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: Arthur gave his go on specs/export-csv.md (4 criteria). You launched the spec-first:run workflow; it is running in the background and its result has not arrived. Nothing else in the run is left for you to do until it returns. Arthur has not written anything since his go.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
-   "expected_output": "A message that keeps the turn open: at most a one-line progress note, followed by a tool call that runs the keep-waiting script (or otherwise waits for the workflow) — never a text-only message that ends the turn.",
+   "expected_output": "A single short line in French, in terms of the run or its criteria, that ends the turn while the workflow runs — no polling tool call (no sleep, no wait loop), no question, no options, no request to type 'continue'; the workflow's completion notification resumes the run.",
    "files": [],
    "expectations": [
-    "The message is followed by a tool call that waits for the running workflow (e.g. the keep-waiting script) -- it does not end the turn with text only",
+    "The message does not call a tool to wait, sleep or poll for the running workflow, and does not re-launch it",
     "The message does not ask Arthur anything nor tell him to come back or type 'continue'",
     "Any text is at most one short line in French, in terms of criteria or the run, with no technical detail"
    ]

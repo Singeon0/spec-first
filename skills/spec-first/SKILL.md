@@ -14,7 +14,6 @@ description: >-
 disable-model-invocation: true
 allowed-tools:
   - Workflow
-  - Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/keep-waiting.sh" *)
 ---
 
 # Spec-first — he owns the what, you own the how
@@ -142,21 +141,23 @@ the gap to him. An unverified result is labeled « non vérifié », never
 presented as done.
 
 **Between the go and a stop point, every message you send carries a tool
-call.** A message without one ends your turn and stops the work; the only
-such message is the stop itself. Never end a turn with: a summary that
-announces the next step; an offer to continue unless he prefers
-otherwise; a list of decisions that block nothing; a milestone report.
+call**, except the wait line below. Any other message without one ends
+your turn and stops the work; the only such message is the stop itself.
+Never end a turn with: a summary that announces the next step; an offer
+to continue unless he prefers otherwise; a list of decisions that block
+nothing; a milestone report.
 Put progress notes and recommendations in the same message as your next
 tool call, and keep going on whatever does not depend on him. Progress
 notes speak in criteria only — « Critère 2/4 validé par le critique. » —
 never files, steps or your next technical move.
 
-**Waiting is never a stop.** A workflow, sub-agent or command still
+**Waiting is not a stop either.** A workflow, sub-agent or command still
 running in the background means the run is not done. Do whatever does not
-depend on it; then hold your turn until its result arrives: run
-`bash "${CLAUDE_PLUGIN_ROOT}/scripts/keep-waiting.sh" 60` as a standalone
-command, again each time it returns, and resume as soon as the result is
-in. Never end the turn to wait — he would have to type « continue ».
+depend on it; then end the turn with one line in criteria terms
+(« Run en cours — critères 1 à 4. ») — no question, no options, no next
+step. Its completion notification resumes you on its own: he types
+nothing. Never poll — no sleep, no loop of commands to hold the turn — and
+never re-launch work that is still running.
 
 The run stops only at three points: **all criteria pass** (clean up, then
 the end — §8), you are **truly blocked**, or the **spec
@@ -257,8 +258,8 @@ the criteria numbered as in the spec:
 
 Use it as is, or surround it with your own workflows when the spec calls
 for it — e.g. a codebase-wide research fanned out to Haikus before the
-developers start. Workflows run in the background: hold your turn (§4)
-until each returns. Then:
+developers start. Workflows run in the background: wait as §4 says until
+each returns. Then:
 - tick each « validé » criterion in the spec, add « Décisions prises
   pendant le run », then clean up and end (§8);
 - « non vérifié »: say what is missing to check it — never « terminé »;

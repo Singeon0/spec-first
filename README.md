@@ -60,5 +60,6 @@ done and stops — no next steps. What the work revealed beyond the spec
 second spec, to launch in a new conversation; the run never grows to
 cover it.
 
-`scripts/keep-waiting.sh` keeps the main agent's turn open while a
-workflow runs in the background, so a wait never ends the run.
+While a workflow runs in the background, the main agent ends its turn on a
+one-line status and never polls; the workflow's completion notification
+resumes the run, so the owner never has to type « continue ».
