@@ -1,7 +1,7 @@
 export const meta = {
   name: 'run',
   description: 'spec-first autonomous run: small groups of criteria, a few at a time, each developed in its own copy; three Opus high critics per round, and after a rejection only the critics that did not pass re-judge; developer effort escalation with triage; each validated group merged at once into an integration branch that later groups and rework start from, its copy then removed; reinforced final check of every criterion, repaired by one developer; then, only if the owner authorized it with his go, the external actions he listed (push, merge request, CI, merge, tag, release), checked from outside',
-  whenToUse: 'Called by the spec-first skill after the owner gave his go on a spec. args: { specPath, projectRoot, baseCommit, criteria: [{ id, text }], groups?: [[ids]], testCommand?, quickTestCommand?, setupCommand?, subdir?, finalCheck?: boolean, recheck?: [{ id, text }], startEffort?: { [id]: "medium"|"high"|"xhigh" }, specBaseCommit?, integrationBranch?, maxGroups?: number, exclusive?: { [resource]: [ids] } | [string], publish?: { actions: string, criteria: [ids] }, budget?: number } with absolute paths. baseCommit is required: `git rev-parse HEAD` in projectRoot right before the call. An integration copy is made first; each group works in its own git worktree under <projectRoot>/.spec-first/copies, named after the spec, made from the integration branch; at most maxGroups groups (default 3) are active at once, the others wait; groups omitted → one group per criterion. Every validated group is merged into one integration branch, which the skill squashes into the project at the end. testCommand: the full test suite, run only in the final check; quickTestCommand: the targeted tests developers, critics and fusions run. setupCommand: makes a fresh copy runnable, commit hooks included; subdir: the sub-folder of projectRoot where setup and tests run. finalCheck: false skips the final check (first run of a two-run spec); recheck: criteria an earlier run of the same spec validated, judged again in the final check; criteria empty with recheck → final check only. startEffort: the effort a relaunched criterion resumes from. specBaseCommit: the commit the whole spec started from (two-run spec), read by the final security and maintainer critics. integrationBranch: the integration branch of an interrupted run to start from (its criteria go in recheck). exclusive: resources only one agent may use at a time, each with the criteria that need it (a plain list: every criterion) — the run holds the locks. publish: the external actions the owner authorized with his go and the criteria they make true, applied after the final check; a publication criterion held only by other criteria comes back blocked with kind « attente »: relaunch it in recheck with the same publish. budget: output tokens; the run stops cleanly before it. Not for a bare slash-command call without args: tell the user to run /spec-first instead.',
+  whenToUse: 'Called by the spec-first skill after the owner gave his go on a spec. args: { specPath, projectRoot, baseCommit, criteria: [{ id, text }], groups?: [[ids]], testCommand?, quickTestCommand?, setupCommand?, subdir?, finalCheck?: boolean, recheck?: [{ id, text }], startEffort?: { [id]: "medium"|"high"|"xhigh" }, specBaseCommit?, integrationBranch?, maxGroups?: number, exclusive?: { [resource]: [ids] } | [string], publish?: { actions: string, criteria: [ids] }, dependsOn?: { [id]: [ids] }, budget?: number } with absolute paths. baseCommit is required: `git rev-parse HEAD` in projectRoot right before the call. An integration copy is made first; each group works in its own git worktree under <projectRoot>/.spec-first/copies, named after the spec, made from the integration branch; at most maxGroups groups (default 3) are active at once, the others wait; groups omitted → one group per criterion. Every validated group is merged into one integration branch, which the skill squashes into the project at the end. testCommand: the full test suite, run only in the final check; quickTestCommand: the targeted tests developers, critics and fusions run. setupCommand: makes a fresh copy runnable, commit hooks included; subdir: the sub-folder of projectRoot where setup and tests run. finalCheck: false skips the final check (first run of a two-run spec); recheck: criteria an earlier run of the same spec validated, judged again in the final check; criteria empty with recheck → final check only. startEffort: the effort a relaunched criterion resumes from. specBaseCommit: the commit the whole spec started from (two-run spec), read by the final security and maintainer critics. integrationBranch: the integration branch of an interrupted run to start from (its criteria go in recheck). exclusive: resources only one agent may use at a time, each with the criteria that need it (a plain list: every criterion) — the run holds the locks. publish: the external actions the owner authorized with his go and the criteria they make true, applied after the final check. dependsOn: the criteria each criterion builds on — its group starts once they are merged. A criterion held only because what it depends on did not pass comes back blocked with kind « attente » (« en attente des dépendances »), waitingFor and relaunchAs: relaunch it as is with those criteria, in relaunchAs (recheck or criteria) — the publication criteria are one case, they depend on every other criterion (same publish). budget: output tokens; the run stops cleanly before it. Not for a bare slash-command call without args: tell the user to run /spec-first instead.',
   phases: [
     { title: 'Développement', detail: 'opus, one developer per group, a few groups at a time; medium, then high, then xhigh after each rejection, sorting each rejection first: a slip to fix or an approach to change' },
     { title: 'Critique', detail: 'opus high: tester, owner and maintainer judge each criterion blind to each other; after a rejection, only the critics that did not pass judge again' },
@@ -70,6 +70,30 @@ if (input.publish != null) {
   PUBLISH = { actions: String(p.actions).trim(), ids: [...new Set(ids)] }
 }
 const isPub = id => !!PUBLISH && PUBLISH.ids.includes(String(id))
+
+// What a criterion builds on: other criteria of this run or of recheck. A group starts only once the
+// groups it depends on are merged; a criterion whose dependencies are not validated is held
+// « en attente des dépendances » — never a failure of its own — and relaunched as is with them.
+// The publication is one case: its criteria depend on every other criterion.
+const DEPS = {}
+if (input.dependsOn != null) {
+  if (typeof input.dependsOn !== 'object' || Array.isArray(input.dependsOn)) log('dependsOn ignoré : ce doit être { id: [ids des critères dont il dépend] }.')
+  else {
+    for (const [id, v] of Object.entries(input.dependsOn)) {
+      const want = (Array.isArray(v) ? v : [v]).map(String)
+      const ok = want.filter(d => byId[d] && d !== String(id))
+      if (!byId[id]) log(`dependsOn ignoré pour « ${id} » : critère inconnu.`)
+      else if (ok.length < want.length) log(`dependsOn « ${id} » : dépendance(s) ignorée(s) : ${want.filter(d => !ok.includes(d)).join(', ')}.`)
+      if (byId[id] && ok.length) DEPS[id] = [...new Set(ok)]
+    }
+  }
+}
+const depsOf = (id, withPub) => [...new Set([...(DEPS[id] || []), ...(withPub && isPub(id) ? ALL.map(c => c.id).filter(x => x !== id) : [])])]
+const plural = (ids, one, many) => ids.length > 1 ? many : one
+const waiting = (unmet, relaunchAs) => ({
+  status: 'blocked', kind: 'attente', waitingFor: unmet, relaunchAs,
+  reason: `en attente des dépendances : ${plural(unmet, 'critère', 'critères')} ${unmet.join(', ')} pas encore ${plural(unmet, 'validé', 'validés')}`,
+})
 
 let FINAL = input.finalCheck !== false
 if (!FINAL && (RECHECK.length || PUBLISH)) {
@@ -162,7 +186,22 @@ if (input.groups != null && CRITERIA.length) {
   const big = groupIds.filter(g => g.length > 3).length
   if (big) log(`${big} groupe(s) de plus de 3 critères : plus lents à aboutir.`)
 }
+// Groups that depend on others come after them (stable order otherwise); a cycle is ignored.
+{
+  const groupOf = id => groupIds.findIndex(g => g.includes(id))
+  const needs = groupIds.map((g, i) => [...new Set(g.flatMap(id => (DEPS[id] || []).map(groupOf)).filter(j => j >= 0 && j !== i))])
+  const order = []
+  const left = groupIds.map((g, i) => i)
+  while (left.length) {
+    const k = left.findIndex(i => needs[i].every(j => order.includes(j)))
+    if (k < 0) { log(`dependsOn : dépendances circulaires entre les groupes ${left.map(i => groupIds[i].join('+')).join(', ')} — ignorées pour l'ordre.`); order.push(...left.splice(0)); break }
+    order.push(left.splice(k, 1)[0])
+  }
+  groupIds = order.map(i => groupIds[i])
+}
 const GROUPS = groupIds.map((ids, i) => ({ id: String(i + 1), criteria: ids.map(id => byId[id]) }))
+// The groups a group waits for: those holding what its criteria depend on, earlier in the order.
+const groupNeeds = GROUPS.map((g, i) => [...new Set(g.criteria.flatMap(c => (DEPS[c.id] || []).map(d => GROUPS.findIndex(x => x.criteria.some(y => y.id === d)))))].filter(j => j >= 0 && j < i))
 
 // Every agent gets its own ten ports, from its group, its role and its round — never from the order
 // agents finish in — so a resumed run (resumeFromRunId) gives each agent the same prompt again.
@@ -194,6 +233,7 @@ function overBudget(what) {
 const DECISIONS_RULE = 'choices the spec did not settle that change what the owner can see or use, one short sentence each, in French, in plain words (what the result does, not how; no file or library names). Not what you did not do, and not problems outside the spec — the critics report those. Usually empty.'
 const TECH = 'TECHNIQUE:'
 const ISOLATION = 'ISOLATION:'
+const DEPENDS = 'DEPENDS:' // a blocker: another criterion of the spec it builds on is missing or broken
 
 const devSchema = ids => ({
   type: 'object',
@@ -230,7 +270,7 @@ const devSchema = ids => ({
       },
     },
     decisions: { type: 'array', items: { type: 'string' }, description: DECISIONS_RULE },
-    blocker: { type: 'string', description: `empty unless the spec itself must change or the owner must decide before any progress is possible; a technical cause outside your changes (environment, hook, missing tool) starts with "${TECH}"` },
+    blocker: { type: 'string', description: `empty unless the spec itself must change or the owner must decide before any progress is possible; a technical cause outside your changes (environment, hook, missing tool) starts with "${TECH}"; another criterion of this spec your criteria build on is missing or broken starts with "${DEPENDS}", then its ids and why (e.g. "${DEPENDS} 2 — …")` },
   },
   required: ['workspace', 'branch', 'changed', 'files', 'summary', 'triage', 'selfCheck', 'decisions', 'blocker'],
 })
@@ -372,7 +412,18 @@ const PUB_SCHEMA = {
 // ---------------------------------------------------------------- helpers
 const list = (cs, tag = 'criteria') => `<${tag}>\n${cs.map(c => `<criterion id="${c.id}">${c.text}</criterion>`).join('\n')}\n</${tag}>`
 const clean = p => String(p || '').replace(/\/+$/, '')
-const kindOf = b => String(b).startsWith(TECH) || String(b).startsWith(ISOLATION) ? 'technique' : 'question'
+// The criteria a « DEPENDS: » blocker names (ids before the first dash), outside the blocked ones.
+const dependsNamed = (b, own = []) => !String(b).startsWith(DEPENDS) ? []
+  : [...new Set((String(b).slice(DEPENDS.length).split(/\s[—–-]\s/)[0].match(/[^\s,;]+/g) || []).filter(id => byId[id] && !own.includes(id)))]
+const kindOf = b => String(b).startsWith(TECH) || String(b).startsWith(ISOLATION) ? 'technique'
+  : dependsNamed(b).length ? 'attente' : 'question'
+// A blocked criterion's fields: a dependency wait says what it waits for, and comes back in criteria.
+const blockedFields = (b, own) => {
+  const unmet = dependsNamed(b, own)
+  if (!unmet.length) return { status: 'blocked', kind: kindOf(b), reason: b }
+  const w = waiting(unmet, 'criteria')
+  return { ...w, reason: `${w.reason} — ${String(b).slice(DEPENDS.length).trim()}` }
+}
 const errText = e => String((e && e.message) || e || 'erreur inconnue').slice(0, 200)
 
 // The run's own locks on the exclusive resources: one agent at a time, released when the agent
@@ -706,6 +757,10 @@ async function runGroup(g) {
   const tag = `Groupe ${g.id}`
   const ids = g.criteria.map(c => c.id)
   const locks = locksFor(ids)
+  // What this group builds on, from other groups or an earlier run: merged before it starts.
+  const needs = [...new Set(g.criteria.flatMap(c => DEPS[c.id] || []))].filter(d => !ids.includes(d))
+  const depNote = needs.length ? `
+Your criteria build on criteria ${needs.join(', ')}, done elsewhere: they are already merged into the branch your copy starts from. Missing or broken there → blocker "${DEPENDS} ${needs.join(', ')} — why", never a workaround.` : ''
   const results = {}
   const book = Object.fromEntries(ids.map(id => [id, {}]))
   const history = Object.fromEntries(ids.map(id => [id, []]))
@@ -745,7 +800,7 @@ First bring in what other groups already merged, so your fix starts from it: \`g
 Spec: ${SPEC} — read it first (goal, criteria, out of scope).
 Your criteria:
 ${list(pending)}
-${done.length ? `Already validated in this group — keep them working:\n${list(done, 'validated_criteria')}\n` : ''}Other criteria of the spec belong to other developers, who may touch the same files: do not implement them.${pubIds.length ? `
+${done.length ? `Already validated in this group — keep them working:\n${list(done, 'validated_criteria')}\n` : ''}Other criteria of the spec belong to other developers, who may touch the same files: do not implement them.${depNote}${pubIds.length ? `
 Criteria ${pubIds.join(', ')} are publication criteria: prepare everything they need (version, changelog, files), but never push or publish — a later phase does it, with the owner's authorization.` : ''}
 
 ${workspaceRule(g, where, branch, from)}${catchUp}
@@ -754,7 +809,7 @@ ${nudge}${feedback}
 Tests: ${quickTestCommand ? `targeted ones — \`${quickTestCommand}\`, or narrower` : 'run the ones that cover your criteria'}${SUBDIR ? `, from the copy's ${SUBDIR} folder` : ''}.${testCommand ? ` The full suite runs only ${FULL_SUITE_WHEN}: do not run it.` : ''}
 An independent panel judges every criterion on the real result.
 Never run commands that rewrite files outside your criteria (repo-wide formatters, lockfile upgrades). If you need a new dependency, add it the project's usual way and say so in your summary.
-"blocker" stays empty unless you cannot make any progress without the owner changing or clarifying the spec — or, starting with "${TECH}", a technical cause outside your changes stops you (a hook, the environment, a missing tool).
+"blocker" stays empty unless you cannot make any progress without the owner changing or clarifying the spec — or, starting with "${TECH}", a technical cause outside your changes stops you (a hook, the environment, a missing tool) — or, starting with "${DEPENDS}" and their ids, other criteria of the spec your criteria build on are missing or broken in your copy.
 
 ${COMMON_RULES}`
       const dev = await ask(devPrompt, {
@@ -800,7 +855,7 @@ ${COMMON_RULES}`
       if (dev.blocker) {
         blocker = String(dev.blocker)
         if (!dev.changed) {
-          for (const c of pending) results[c.id] = { status: 'blocked', kind: kindOf(blocker), rounds: round + 1, effortReached: effort, reason: blocker }
+          for (const c of pending) results[c.id] = { rounds: round + 1, effortReached: effort, ...blockedFields(blocker, ids) }
           pending = []
           break
         }
@@ -832,7 +887,7 @@ ${changesHint(where)}${mergedIn ? ' Work merged into this copy before (other gro
       log(`${tag} : essai ${round + 1} (opus ${effort}) — ${pending.length - rejected.length}/${pending.length} critère(s) passé(s)${round ? ` · rejugé par : ${seats.map(s => s.label).join(', ')}` : ''}`)
       if (blocker) {
         // The developer said the spec must change, or the environment stops him: another round cannot fix that.
-        for (const c of rejected) results[c.id] = { ...results[c.id], status: 'blocked', kind: kindOf(blocker), reason: blocker }
+        for (const c of rejected) results[c.id] = { ...results[c.id], ...blockedFields(blocker, ids) }
         pending = []
         break
       }
@@ -847,7 +902,7 @@ ${changesHint(where)}${mergedIn ? ' Work merged into this copy before (other gro
   const r = { group: g.id, criteria: ids, where, branch, results, blocker, kind: blocker ? kindOf(blocker) : '', integrated: false, removed: false }
   if (r.where && hasPassing(r)) {
     if (!r.branch) keepBlocked(r, `Copie rendue sans nom de branche — travail conservé dans ${r.where}.`)
-    else fuseQueued(r) // not awaited: the group's slot goes to the next group while the fusion runs
+    else r.fusion = fuseQueued(r) // not awaited: the group's slot goes to the next group while the fusion runs
   }
   return r
 }
@@ -983,17 +1038,33 @@ const stoppedGroup = (g, status, reason) => ({
   group: g.id, criteria: g.criteria.map(c => c.id), where: '', branch: '', blocker: '', kind: '', integrated: false, removed: false,
   results: Object.fromEntries(g.criteria.map(c => [c.id, { status, rounds: 0, reason, ...(status === 'blocked' ? { kind: 'technique' } : {}) }])),
 })
+// A group that depends on others (dependsOn) starts once they are done and merged; the order puts
+// them first, so a group never waits for one not started yet. They did not pass → it is not launched:
+// its criteria wait for them, « en attente des dépendances ».
+const groupDone = GROUPS.map(() => { let settle; const p = new Promise(r => { settle = r }); return { p, settle } })
+const statusSoFar = id => {
+  if (RECHECK.some(c => c.id === id)) return 'unverified'
+  const r = groupResults.find(x => x && x.criteria.includes(id))
+  return r ? (r.results[id] || {}).status : ''
+}
 let nextGroup = 0
 async function worker() {
   while (nextGroup < GROUPS.length) {
     const i = nextGroup++
     const g = GROUPS[i]
-    if (overBudget(`le groupe ${g.id}`)) { groupResults[i] = stoppedGroup(g, 'blocked', `Arrêté : ${stopped}.`); continue }
     try {
-      groupResults[i] = await runGroup(g)
+      await Promise.all(groupNeeds[i].map(j => groupDone[j].p))
+      const unmet = [...new Set(g.criteria.flatMap(c => DEPS[c.id] || []))].filter(d => !g.criteria.some(c => c.id === d) && !PASSING.includes(statusSoFar(d)))
+      if (overBudget(`le groupe ${g.id}`)) groupResults[i] = stoppedGroup(g, 'blocked', `Arrêté : ${stopped}.`)
+      else if (unmet.length) {
+        groupResults[i] = { ...stoppedGroup(g, 'blocked', ''), results: Object.fromEntries(g.criteria.map(c => [c.id, { rounds: 0, ...waiting(unmet, 'criteria') }])) }
+        log(`Groupe ${g.id} : pas lancé, ${waiting(unmet, 'criteria').reason}`)
+      } else groupResults[i] = await runGroup(g)
     } catch (e) {
-      groupResults[i] = stoppedGroup(g, 'crashed', "le groupe s'est arrêté sur une erreur (panne)")
+      groupResults[i] = groupResults[i] || stoppedGroup(g, 'crashed', "le groupe s'est arrêté sur une erreur (panne)")
     }
+    // Done once its fusion is settled: the groups that depend on it start from the merged result.
+    Promise.resolve(groupResults[i].fusion).then(() => groupDone[i].settle(), () => groupDone[i].settle())
   }
 }
 if (integFailed) GROUPS.forEach((g, i) => { groupResults[i] = stoppedGroup(g, 'blocked', integFailed) })
@@ -1029,6 +1100,26 @@ const status = {}
 for (const r of groupResults) Object.assign(status, r.results)
 // An earlier run's criterion counts as validated only once this final check judged it again.
 for (const c of RECHECK) status[c.id] = { status: 'unverified', earlierRun: true, reason: 'validé par un run précédent, pas encore rejugé au contrôle final', proof: '' }
+
+// The dependencies rule: a criterion still passing whose dependencies did not pass is held « en
+// attente des dépendances » — its own work already passed, so it comes back in recheck. Applied
+// until nothing changes (a criterion waiting holds those that depend on it). withPub: the
+// publication criteria depend on every other criterion.
+function holdDependents(passed, withPub) {
+  for (let changed = true; changed;) {
+    changed = false
+    for (const c of ALL) {
+      const s = status[c.id] || {}
+      if (!PASSING.includes(s.status)) continue
+      const unmet = depsOf(c.id, withPub).filter(d => !passed((status[d] || {}).status))
+      if (!unmet.length) continue
+      status[c.id] = { ...s, ...waiting(unmet, 'recheck') }
+      changed = true
+    }
+  }
+}
+// Before the final check: what waits for a criterion that failed is not judged again.
+holdDependents(st => PASSING.includes(st), !stopped)
 
 // Where the result lives: the integration copy (something merged, or an interrupted run's branch) or the project.
 let TARGET = integ.where && (integratedGroups.length || IB) ? integ.where : ROOT
@@ -1150,7 +1241,7 @@ Work in the integration copy ${TARGET} (branch ${integ.branch}): every file you 
 Fix only what broke. Re-run the reproductions and the targeted tests${quickTestCommand ? ` (\`${quickTestCommand}\`)` : ''}${SUBDIR ? ` from the copy's ${SUBDIR} folder` : ''} before returning; the full suite runs again in the re-check.
 ${portRule(FINAL_SLOT + 90 + round)}${holdLine(locksFor(brokenIds))}
 Never run commands that rewrite files outside the broken criteria (repo-wide formatters, lockfile upgrades).
-"blocker" stays empty unless you cannot make any progress without the owner changing or clarifying the spec — or, starting with "${TECH}", a technical cause outside your changes stops you.
+"blocker" stays empty unless you cannot make any progress without the owner changing or clarifying the spec — or, starting with "${TECH}", a technical cause outside your changes stops you — or, starting with "${DEPENDS}" and their ids, other criteria the broken ones build on are missing or broken.
 
 ${COMMON_RULES}`, { model: 'opus', effort, schema: devSchema(brokenIds), phase: 'Contrôle final', label: `Réparation essai ${round + 1} (opus ${effort})`, locks: locksFor(brokenIds) })
       finalCheck.repairRounds = round + 1
@@ -1231,42 +1322,44 @@ A repair was just made: ${dev.summary}. A test that passed before the repair and
     status[c.id] = {
       ...prev,
       status: st,
-      ...(st === 'blocked' ? { kind: kindOf(blockedBy[c.id]) } : {}),
       reason: crashed.has(c.id) ? (interrupted ? `contrôle final arrêté sur une erreur : ${interrupted} (panne)` : "le développeur de la réparation n'a pas répondu, deux fois (panne)")
         : blockedBy[c.id] || (j.status === 'defect' ? j.proofs.join('\n') : (j.reason || '')),
       proof: j.proof || '',
       leads: j.leads,
       ...(reached ? { effortReached: reached } : {}),
+      ...(st === 'blocked' ? blockedFields(blockedBy[c.id], [c.id]) : {}),
     }
   }
 }
 
+// After the final check: what depends on a criterion the final check did not validate waits for it.
+// The publication criteria too, unless a technical block stops the publication anyway.
+holdDependents(st => st === 'validated', !stopped && !ci.block)
+
 // ================================================================= 4. publication
-// Only what the owner authorized with his go, only once every other criterion is validated.
-// The publication criteria were judged on everything but « it is published »: they are validated
-// only when a tester checked them from outside, after the actions were applied. A publication
-// criterion held only by other criteria is blocked with kind « attente »: the next run takes it
-// again, in recheck with the same publish, once those criteria are relaunched.
+// Only what the owner authorized with his go, only once every other criterion is validated — the
+// dependencies rule above, of which the publication is one case. The publication criteria were
+// judged on everything but « it is published »: they are validated only when a tester checked them
+// from outside, after the actions were applied.
 let publication = null
 if (PUBLISH) {
   const pubCriteria = PUBLISH.ids.map(id => byId[id])
-  const hold = (reason, kind, waitingFor = []) => {
+  const hold = (reason, kind) => {
     for (const c of pubCriteria) {
-      if ((status[c.id] || {}).status === 'validated') status[c.id] = { ...status[c.id], status: 'blocked', kind, reason, ...(waitingFor.length ? { waitingFor } : {}) }
+      if ((status[c.id] || {}).status === 'validated') status[c.id] = { ...status[c.id], status: 'blocked', kind, reason }
     }
-    publication = { done: false, rounds: 0, steps: [], reason, ...(waitingFor.length ? { waitingFor } : {}) }
+    publication = { done: false, rounds: 0, steps: [], reason }
     log(`Publication non lancée : ${reason}`)
   }
-  const notValidated = cs => cs.filter(c => (status[c.id] || {}).status !== 'validated').map(c => c.id)
-  // What it waits for: the other criteria first; when they are all validated, the publication
-  // criteria that are not.
-  const othersLeft = notValidated(ALL.filter(c => !isPub(c.id)))
-  const waitFor = othersLeft.length ? othersLeft : notValidated(pubCriteria)
-  const plural = waitFor.length > 1
+  const waitFor = [...new Set(pubCriteria.flatMap(c => (status[c.id] || {}).waitingFor || []))]
+  const notReady = pubCriteria.filter(c => (status[c.id] || {}).status !== 'validated').map(c => c.id)
   if (stopped) hold(`Arrêté : ${stopped}.`, 'technique')
   else if (ci.block) hold(ciReason(ci.block), 'technique')
-  else if (waitFor.length) hold(`en attente ${plural ? 'des critères' : 'du critère'} ${waitFor.join(', ')}, pas encore validé${plural ? 's' : ''} : la publication part quand ${plural ? 'ils le sont' : "il l'est"}.`, 'attente', waitFor)
-  else if (!finalCheck || finalCheck.skipped || finalCheck.interrupted) hold('le contrôle final n\'a pas eu lieu jusqu\'au bout.', 'technique')
+  else if (notReady.length) {
+    const reason = waitFor.length ? waiting(waitFor, 'recheck').reason : `${plural(notReady, 'critère', 'critères')} de publication ${notReady.join(', ')} pas ${plural(notReady, 'validé', 'validés')}`
+    publication = { done: false, rounds: 0, steps: [], reason, ...(waitFor.length ? { waitingFor: waitFor } : {}) }
+    log(`Publication non lancée : ${reason}`)
+  } else if (!finalCheck || finalCheck.skipped || finalCheck.interrupted) hold('le contrôle final n\'a pas eu lieu jusqu\'au bout.', 'technique')
   else if (!(await ensureCopy('publication', 'Publication'))) hold("pas de copie d'intégration où appliquer les actions autorisées.", 'technique')
   else {
     phase('Publication')

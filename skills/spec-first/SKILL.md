@@ -129,7 +129,7 @@ No steps, technical choices or how — he approves an outcome, not a method. Cla
 - never poll (no sleep, no command loop holding the turn); never re-launch running work
 - a long command of your own (> 2 min: e2e, CI, training) → background, output in a file, short bounded waits (each ≤ 5 min — `timeout`, a loop with a max count — repeated as needed: a shell command is cut at 10 min) · never `pgrep -f` on a pattern (it finds itself), never `sleep` after `sleep` · remote CI → its API, ≥ 60 s between reads, total limit stated
 - watchdog, the one allowed check: `ScheduleWakeup` ≥ 1 h → read the workflow's journal · an agent stuck since the last check → `TaskStop` the workflow, relaunch it with `resumeFromRunId` and the same args (finished agents come back from cache, the stuck one starts again) → one line in criteria terms
-- run interrupted (`TaskStop`, session closed, /compact) → relaunch it at once: `resumeFromRunId` + the same args · run id lost, or args must change → a new run with `integrationBranch` = the integration branch it left (`git branch --list 'spec-first-<specId>--integration-*'`): `recheck` = the criteria of the groups merged into it (one « Merge branch 'spec-first-<specId>--g<N>-…' » per group in its log), `criteria` = the others · never a question, never a run of your own
+- run interrupted (`TaskStop`, session closed, /compact) → relaunch it at once: `resumeFromRunId` + the same args · run id lost, or args must change → a new run with `integrationBranch` = the integration branch it left (`git branch --list 'spec-first-<specId>--integration-*'`): `recheck` = the criteria of the groups merged into it (one « Merge branch 'spec-first-<specId>--g<N>-…' » per group in its log), `criteria` = the others · never a question
 - never wait hours on an answer from him during a run
 
 **Only three stop points**
@@ -174,7 +174,7 @@ Good: « Estimation : environ 10 minutes, extrapolée de la première époque �
 ## 6. His channels, your own hands
 
 - He named a skill, agent profile or process for a kind of work → use it. It fails → report and ask; never route around it (the channel is his decision).
-- A run's process is always `spec-first:run`, named or not. It returns `{error}` → fix the args and relaunch it at once, no question; never route around it (§7).
+- A run's process is always `spec-first:run`, named or not. It returns `{error}` → first fix the args and relaunch it, no question; only the Workflow tool absent or failing → the fallback of §7, under the same rules.
 - Before handing him an action → check your own access first (open session, SSH, CLI). Genuinely needs him → say why.
 - Persistent instruction files (CLAUDE.md): only what the model can't rediscover with a few tool uses.
 
@@ -182,9 +182,9 @@ Good: « Le skill GitLab échoue avec telle erreur. A : je réessaie via le skil
 
 ## 7. Orchestrate the run
 
-You orchestrate: you neither write nor judge the code — sub-agents do. Your job: cut the work into everything that can run at once, the right model per piece. Every run goes through `spec-first:run` (below), in the background.
-- workflows of your own: only research before the run (e.g. codebase-wide research fanned out to Opus medium agents) or publication after it — never one that develops or judges criteria · writing one → load the workflow-authoring skill first
-- his « accélère », « reprends », « relance » → arguments of `spec-first:run`, never a workflow of your own: accélère → `maxGroups` raised (a run in progress: `TaskStop`, then `resumeFromRunId` with it — finished agents come back from cache), and for the next run finer `groups`, a `quickTestCommand` · reprends → `resumeFromRunId`, else `integrationBranch` (§4, waiting) · relance → the criteria left, `startEffort`, `recheck`
+You orchestrate: you neither write nor judge the code — sub-agents do. Your job: cut the work into everything that can run at once, the right model per piece. Every run goes through `spec-first:run` (below), in the background — by hand only in its fallback (end of §7).
+- workflows of your own around it, when the spec calls for it (e.g. codebase-wide research fanned out to Opus medium agents before the developers start) · writing one → load the workflow-authoring skill first · same rules as the run: models, efforts, critics, final check
+- his « accélère », « reprends », « relance » → arguments of `spec-first:run`: accélère → `maxGroups` raised (a run in progress: `TaskStop`, then `resumeFromRunId` with it — finished agents come back from cache), and for the next run finer `groups`, a `quickTestCommand` · reprends → `resumeFromRunId`, else `integrationBranch` (§4, waiting) · relance → the criteria left, `startEffort`, `recheck`
 
 **Models — Opus only, medium at least** (his decision: every agent gets real work, of uneven difficulty)
 - **Opus medium**: default for real work — developing, analysing, research, aggregating, publishing.
@@ -194,7 +194,7 @@ You orchestrate: you neither write nor judge the code — sub-agents do. Your jo
 - Never Sonnet, Haiku or Fable · never Opus max (his call alone).
 - Every agent you launch: explicit model + effort (else it takes your session's, max included).
 
-**Judging — what `spec-first:run` does** (the same by hand only when the Workflow tool is absent; one exception: the one-sentence spec, below)
+**Judging — same in every workflow, ready-made or yours, and in the fallback** (one exception: the one-sentence spec, below)
 
 ```
 developer ──→ 3 critics, blind to each other, judge each criterion ──→ all pass ✓
@@ -216,7 +216,7 @@ all groups done → final check of every criterion on the whole result (Opus xhi
 - criterion passes = tester verified it on the real result + no critic proved a defect; a defect without a reproduction is not one
 
 **`spec-first:run`** — ready-made: developers, critics, escalation, fusion, final check, publication. Call right after his go (and the « travail en cours » commit, if any), absolute paths, criteria numbered as in the spec:
-`Workflow({name: "spec-first:run", args: {specPath, projectRoot, baseCommit, criteria: [{id, text}], groups, testCommand, quickTestCommand, setupCommand, subdir, maxGroups, exclusive, publish, budget, finalCheck, recheck, startEffort, specBaseCommit, integrationBranch}})`
+`Workflow({name: "spec-first:run", args: {specPath, projectRoot, baseCommit, criteria: [{id, text}], groups, testCommand, quickTestCommand, setupCommand, subdir, maxGroups, dependsOn, exclusive, publish, budget, finalCheck, recheck, startEffort, specBaseCommit, integrationBranch}})`
 - `projectRoot`: git repository top (§4) · `baseCommit` (required): `git rev-parse HEAD`, right before the call
 - `groups`: every criterion id of this run once · one group per criterion; two share a group only when one can't be checked without the other; ≤ 3 per group · groups may touch the same files: the fusion resolves conflicts · omitted → one group per criterion · every group: its own developer, in its own copy (`.spec-first/copies/<specId>--…`, hidden from git locally) made from the run's integration branch — never in the project itself
 - `testCommand`: the full suite, run from `subdir` (else the repository top) · only in the final check, once, by one tester · omit if none
@@ -225,6 +225,7 @@ all groups done → final check of every criterion on the whole result (Opus xhi
 - commit hooks: always run in the copies, never `--no-verify` · one failing for a cause outside the run's changes → technical block (§4), never a question
 - `subdir`: the project's folder inside the repository (monorepo) · pass it whenever `projectRoot` is not that folder: copies at the repository top, setup and tests from `subdir`
 - `maxGroups`: groups active at once (default 3) — the rest wait, each starts as soon as one finishes · pass it lower when the machine is small or the criteria heavy (training, e2e), higher when he asks to speed up and the machine allows
+- `dependsOn`: `{id: [ids it builds on]}` — the criteria of this run or of `recheck` a criterion needs · its group starts once theirs are merged; they do not pass → it waits, « en attente des dépendances » (below) · pass it whenever a criterion builds on another of the same run (a socle criterion taken again, a relaunch with its dependencies)
 - `exclusive`: `{"<resource>": [ids of the criteria that need it]}` — a GPU machine, a device, a fixed port, a browser profile · the run lends each to one agent at a time · pass it whenever two criteria would use the same one at once · a plain list → every criterion needs each
 - `publish`: `{actions, criteria}` — the external actions his go authorized (§4), in one readable line, and the ids of the criteria they make true · the CI may start during the run (branch pushed early, if listed); merging, tagging, publishing after the final check, once every other criterion is validated; checked from outside by a fresh tester · omitted → nothing is pushed, published or merged
 - `budget`: output tokens, only when he set a limit → the run stops cleanly before it, partial report
@@ -240,7 +241,7 @@ run 2: the other criteria, baseCommit = that commit, specBaseCommit = run 1's ba
        → its final check judges every criterion of the spec (security and maintainer read from specBaseCommit) → one report for both runs
 ```
 - one rule: never two runs at once on the same repository — run 2 starts once run 1 is back and committed
-- run 1 leaves a socle criterion failed or blocked → run 2 takes it again (its own group, in a copy like every group, `startEffort`) with the criteria that don't build on it · those that do → run 3, once it passes
+- run 1 leaves a socle criterion failed or blocked → run 2 takes it again (its own group, in a copy like every group, `startEffort`) with all the others, `dependsOn` for those that build on it: they start once it is merged, or come back « en attente des dépendances »
 - the last reply merges both runs: decisions, findings outside the spec, copies of both
 
 **Several repositories → one run each** (a run never spans two; a sub-project with its own `.git` is one)
@@ -252,11 +253,11 @@ run 2: the other criteria, baseCommit = that commit, specBaseCommit = run 1's ba
 - `publication` (`done`, `steps`, `reason`) and `ci` (`branch` pushed, `mergeRequest` = the request's link, `unavailable`) → what left the machine, said in the last reply
 - another run in the same spec (a relaunch, a changed spec) → first commit the work so far, spec file aside, in one local commit « spec : <nom> (étape N) »; that commit = its `baseCommit` (copies start from it)
 
-It runs in the background → wait (§4) until it returns. It returns `{error}` → fix the args it names and relaunch at once, in the same turn — never a question, never the Agent tool, never a run of your own. Then:
+It runs in the background → wait (§4) until it returns. It returns `{error}` → first fix the args it names and relaunch it, in the same turn — never a question: `{error}` is a wrong argument, not a failing Workflow. Then:
 - « validé » → tick it in the spec, add « Décisions prises pendant le run » → clean up and end (§8)
-- « non vérifié » → never « terminé », never judged with the Agent tool: a critic did not return (« aucun verdict de … »), or the final check did not judge it → `recheck` of the next run (with the criteria to relaunch, if any) · nothing to relaunch → a run with `criteria: []`, `recheck` = them + the other validated criteria: the final check alone, its report holds every criterion · something only he can provide is missing (a device, a credential) → stop point « truly blocked » (§4)
+- « non vérifié » → never « terminé », never judged by a lone Agent call: a critic did not return (« aucun verdict de … »), or the final check did not judge it → `recheck` of the next run (with the criteria to relaunch, if any) · nothing to relaunch → a run with `criteria: []`, `recheck` = them + the other validated criteria: the final check alone, its report holds every criterion · something only he can provide is missing (a device, a credential) → stop point « truly blocked » (§4)
 - « bloqué » by a blocker that is only the how (nothing for him to decide) → decide it, log it under « Décisions prises pendant le run », relaunch it with the others to relaunch
-- « bloqué » with `kind: "attente"` — a publication criterion waiting for the criteria in `waitingFor` → relaunched with them: in `recheck` of that run, with the same `publish`
+- « en attente des dépendances » (« bloqué », `kind: "attente"`) — held only because criteria it depends on (`waitingFor`) did not pass: not a failure of its own, not a technical block → relaunched as is in the next relaunch, together with those criteria — in `relaunchAs` (`recheck` when its own work already passed, `criteria` otherwise), with the same `dependsOn` · a publication criterion is one case: it depends on every other criterion; the same `publish` · what it waits for reaches a stop point → it waits there with it, listed with it
 - « en échec » after three rounds → commit the work so far (« étape N »), relaunch it, `startEffort` = its `effortReached`, once
 - every criterion to relaunch → one run, all together, one group each, never one run per criterion · `recheck` = every other criterion of the spec already validated: its final check judges them all on the new code, its report holds every criterion (the goal)
 - technical block → never relaunched as is, no lettered question: stop point with its cause and the one action that lifts it (§4) — « bloqué » with `kind: "technique"` (CI unavailable, a machine down, a copy impossible, a hook failing outside the run's changes), « en panne » (`crashed`: an agent that did not answer, even after the run's own retry), work not merged (« Non intégré » — its branch kept: `copies` with `integrated: false`)
@@ -264,7 +265,7 @@ It runs in the background → wait (§4) until it returns. It returns `{error}` 
 - found beyond the spec (task wider than planned, neighbouring problem) → never added to this run → second spec (§8)
 
 One-sentence spec (small reversible task, §4) → no workflow: one Opus medium sub-agent does it, one Opus high tester checks it.
-Workflow tool absent from the session (not merely failing) → same roles via the Agent tool, same models and efforts, the three critics launched in one message. A Workflow call that fails → relaunched, never replaced by the Agent tool.
+Workflow tool unavailable or failing → same roles via the Agent tool, under the same rules: same models and efforts, the three critics launched in one message, escalation, fusion, the final check of every criterion.
 
 ## 8. The end: clean up, say it's done, stop
 

@@ -54,14 +54,14 @@ question: the owner gets its cause and the one action that lifts it.
 
 The plugin ships a ready-made workflow, `spec-first:run`
 (`workflows/run.js`), that does all of it for a spec, and every run goes
-through it. The orchestrator never writes a workflow of its own that
-develops or judges criteria — only research before the run, or
-publication after it — and never falls back to plain sub-agents unless
-the Workflow tool is missing from the session. When the workflow returns
-`{error}`, the orchestrator fixes the arguments it names and relaunches
-it at once. The owner's « accélère », « reprends » or « relance » become
-arguments of the same workflow (more groups at once, a resume, the
-criteria left).
+through it. The orchestrator may wrap the workflow in workflows of its
+own (research before the developers start, for instance); when the
+Workflow tool is missing or fails, it falls back to plain sub-agents.
+Either way the rules stay the same: models, efforts, the three critics,
+the final check. When the workflow returns `{error}`, the orchestrator
+first fixes the arguments it names and relaunches it. The owner's
+« accélère », « reprends » or « relance » become arguments of the same
+workflow (more groups at once, a resume, the criteria left).
 
 The run first makes an integration copy of the project; then groups run
 at once (one per criterion when none are given), each developer in its
@@ -86,6 +86,7 @@ Its arguments, and when the orchestrator passes them:
 | `setupCommand` | when a fresh copy needs dependencies, local config or the commit hooks' environment to run |
 | `subdir` | in a monorepo: the project's folder; copies are made at the repository top, setup and tests run from it |
 | `maxGroups` | groups active at once, three by default: lower on a small machine, higher when the owner asks to speed up |
+| `dependsOn` | a criterion builds on another of the same run: its group starts once the other is merged |
 | `exclusive` | a resource two criteria would use at once (a GPU machine, a device, a fixed port), with the criteria that need it: the run lends it to one agent at a time |
 | `publish` | the external actions the owner's go authorized, and the criteria they make true |
 | `budget` | when the owner set a token limit: the run stops cleanly before it |
@@ -117,9 +118,14 @@ Merging, tagging and publishing run after the final check, once every
 other criterion is validated; a fresh tester checks them from outside.
 When they go through a remote CI, its pipeline starts as soon as the
 first group they depend on is merged, and its result counts in the final
-check. A publication criterion held back only by other criteria comes
-back « en attente » and is taken again, with the same `publish`, in the
-run that relaunches them.
+check.
+
+A criterion held back only because criteria it depends on did not pass
+comes back « en attente des dépendances »: not a failure of its own, not
+a technical block. It is relaunched as is in the next relaunch, together
+with those criteria. A publication criterion is one case of this rule —
+it depends on every other criterion — and comes back with the same
+`publish`.
 
 ## The end
 

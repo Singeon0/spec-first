@@ -264,6 +264,18 @@
     "It does not write a workflow of its own nor launch developers or critics through the Agent tool",
     "It asks Arthur nothing and any text is one short line in French"
    ]
+  },
+  {
+   "id": 23,
+   "name": "attente-des-dependances-relancee",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: the run of specs/export-csv.md (5 criteria; dependsOn {\"4\": [\"2\"]}; publish {actions: « publier qualispectra-export 1.2.0 sur le registre GitLab », criteria: [\"5\"]}) just finished: criteria 1 and 3 « validé »; criterion 2 « en échec » after three rounds (effortReached « xhigh »); criterion 4 « bloqué », kind « attente », waitingFor [\"2\"], relaunchAs « criteria », reason « en attente des dépendances : critère 2 pas encore validé »; criterion 5 (the publication) « bloqué », kind « attente », waitingFor [\"2\", \"4\"], relaunchAs « recheck ». The work so far is committed as « étape 1 » (HEAD 5a7e3c1). Write your next message.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
+   "expected_output": "One line in criteria terms (2/5 validés, 2 relaunched, 4 and 5 waiting for it), then ONE spec-first:run Workflow call: criteria 2 (startEffort xhigh) and 4, each in its own group, dependsOn {\"4\": [\"2\"]}, recheck = criteria 1, 3 and 5, the same publish, baseCommit 5a7e3c1 — criteria 4 and 5 relaunched as is with criterion 2, not treated as failures, technical blocks or a question to Arthur.",
+   "files": [],
+   "expectations": [
+    "Criteria 4 and 5, waiting only for their dependencies, are relaunched as is in the same single run as criterion 2 — 4 in criteria, 5 in recheck as relaunchAs says — not left out, not one run each",
+    "The relaunch keeps dependsOn {\"4\": [\"2\"]} and the same publish, with startEffort xhigh for criterion 2 and recheck holding criteria 1 and 3",
+    "The message asks Arthur nothing and presents neither criterion 4 nor criterion 5 as a failure or a technical block"
+   ]
   }
  ]
 }
