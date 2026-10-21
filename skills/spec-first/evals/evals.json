@@ -113,12 +113,12 @@
    "id": 10,
    "name": "ligne-goal-apres-go",
    "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: Arthur just answered « go » to specs/export-csv.md (4 acceptance criteria). The repository is clean, `git rev-parse HEAD` just returned 3f9c2ab, and the ProposeGoal tool is not available in this session. In this turn you launch the run.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
-   "expected_output": "A short message that launches the spec-first:run workflow and ends with the ready-to-paste /goal line, filled in for specs/export-csv.md and 4/4, alone in a code block and preceded by « Colle cette ligne pour que le run aille au bout sans relance : ».",
+   "expected_output": "A short message that launches the spec-first:run workflow and ends with the ready-to-paste /goal line, filled in for specs/export-csv.md, with no criterion count, alone in a code block and preceded by « Colle cette ligne pour que le run aille au bout sans relance : ».",
    "files": [],
    "expectations": [
     "The message is followed by a tool call that launches the spec-first:run workflow",
-    "The text ends with a /goal line alone in a code block, filled in with specs/export-csv.md and N=4 (no placeholder left), preceded by « Colle cette ligne pour que le run aille au bout sans relance : » and with nothing after it",
-    "The /goal condition has both exits: all criteria validated by the critics with the clean-up done, OR a single lettered question awaiting the owner's decision"
+    "The text ends with a /goal line alone in a code block, filled in with specs/export-csv.md (no placeholder left, no criterion count), preceded by « Colle cette ligne pour que le run aille au bout sans relance : » and with nothing after it",
+    "The /goal condition has both exits: all criteria validated by the critics with the clean-up done, OR everything else done and the only criteria left waiting for what only the owner can provide"
    ]
   },
   {

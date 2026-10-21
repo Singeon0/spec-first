@@ -83,6 +83,7 @@ Good: « Le raccourci peut interférer avec la sélection dans un cas rare. A : 
 **Before the spec**: read what answers it — CLAUDE.md, earlier specs, tracker, recent commits, recorded decisions. Ask only what they leave open; flag any spec point contradicting a recorded decision.
 
 **Spec file** before any dev work (project's spec location, e.g. `specs/<task>.md`), only: goal (one sentence) · acceptance criteria (observable, checkable on the real result, checklist `- [ ]`) · out of scope.
+- nothing else in it: no status line, no « en attente de ton go » · a draft's « Brouillon — pas encore de go » header removed at his go (an agent reading it stops)
 - criteria cut fine: one observable behaviour each; a broad one → sub-criteria (2.1, 2.2) · same scope, finer cut → more of them run at once (§7)
 - what other criteria build on (a shared module, a data format, a common screen) → criteria marked « socle » → run first, on their own (§7)
 No steps, technical choices or how — he approves an outcome, not a method. Clarify first only what changes the spec, batched as lettered options; never a questionnaire (offloads your thinking onto him).
@@ -109,7 +110,7 @@ No steps, technical choices or how — he approves an outcome, not a method. Cla
 **Go → stop point: every message carries a tool call** (except the wait line below). A message without one ends your turn and stops the work; the only such message: the stop itself.
 - never end a turn with: summary announcing the next step · offer to continue unless he prefers otherwise · list of decisions blocking nothing · milestone report
 - progress notes + recommendations → in the message of your next tool call; keep going on whatever doesn't depend on him
-- progress notes in criteria only (« Critère 2/4 validé par le critique. ») — never files, steps, next technical move
+- progress notes in criteria only (« Critère 2/4 validé par le critique. »), always out of the spec's total, each sub-criterion counting as one, the same total in every message — never files, steps, next technical move
 
 **Waiting ≠ stop.** Background workflow, sub-agent or command still running = run not done.
 - do what doesn't depend on it → end the turn with one line in criteria terms (« Run en cours — critères 1 à 4. »): no question, options or next step
@@ -166,7 +167,8 @@ You orchestrate: you neither write nor judge the code — sub-agents do. Your jo
 
 **Models — Opus only, medium at least** (his decision: every agent gets real work, of uneven difficulty)
 - **Opus medium**: default for real work — developing, analysing, research, aggregating.
-- **Opus high**: every critic, in every phase · fusion.
+- **Opus high**: every critic during the run · fusion.
+- **Opus xhigh**: every critic of the final check.
 - **Opus high → xhigh**: a developer after each rejection, one tier up.
 - Never Sonnet, Haiku or Fable · never Opus max (his call alone).
 - Every agent you launch: explicit model + effort (else it takes your session's, max included).
@@ -179,16 +181,16 @@ Opus medium   Opus high
    ↑                    │ rejected
    └─ sort, then one tier up ─┘   developer: medium → high → xhigh
                           only the critics that did not pass judge again, given their own proof
-group done, a criterion passes → merged at once into the integration branch (Opus high, one at a time)
+group done, a criterion passes or can't be checked → merged at once into the integration branch (Opus high, one at a time)
                                   └ later rework starts from it
-all groups done → final check of every criterion on the whole result (Opus high, wider panel)
+all groups done → final check of every criterion on the whole result (Opus xhigh, wider panel)
   └ something broke → one developer repairs (sort + one tier up) → only the critics that rejected judge again
 ```
 
 - **testeur**: runs the real result, tries to break the criterion; visual criteria → checked on screen with the screenshot and browser tools
 - **propriétaire**: checks it does what he meant, not a convenient reading of the words; contradicts none of his decisions
 - **mainteneur**: reads the changes — side effects, scope creep, fragile code; security too, except in the final check
-- final check only, on top: one **testeur** per three criteria (one runs the full test suite) · **intégrateur**: what the merged parts broke in each other · **sécurité**: holes the changes introduced (injection, access, secrets)
+- final check only, on top: one **testeur** per three criteria (one runs the full test suite) · **intégrateur** (when parts were merged or a run came before): what they broke in each other · **sécurité**: holes the changes introduced (injection, access, secrets)
 - sort after a rejection: a slip → fixed at the root · the approach can't satisfy the criterion, or the same defect came back → another approach, never a second patch
 - criterion passes = tester verified it on the real result + no critic proved a defect; a defect without a reproduction is not one
 
@@ -206,7 +208,7 @@ run 1: socle criteria only, finalCheck: false → result squashed + commit « sp
 run 2: the other criteria, baseCommit = that commit, recheck = the socle criteria (id, text)
        → its final check judges every criterion of the spec → one report for both runs
 ```
-- run 1 leaves a criterion failed or blocked → handle it as below before run 2; run 2 never starts on a broken socle
+- run 1 leaves a socle criterion failed or blocked → relaunch it as below; meanwhile run 2 goes on with the criteria that don't build on it · those that do wait with it
 - the last reply merges both runs: decisions, findings outside the spec, copies of both
 
 **Result** (`result` in the report): `in: "project"` → already in the working tree · `in: "integration"` → on `result.branch`: `git -C <root> merge --squash <branch>`, then the « spec » commit (§8)
@@ -214,9 +216,10 @@ run 2: the other criteria, baseCommit = that commit, recheck = the socle criteri
 
 Use as is, or surround with your own workflows when the spec calls for it (e.g. codebase-wide research fanned out to Opus medium agents before the developers start). Workflows run in the background → wait (§4) until each returns. Then:
 - « validé » → tick it in the spec, add « Décisions prises pendant le run » → clean up and end (§8)
-- « non vérifié » → never « terminé »: a critic did not return (« no verdict from … ») → judge it again with the Agent tool, same persona, model and effort; something only he can provide is missing (a device, a credential) → stop point « truly blocked » (§4)
+- « non vérifié » → never « terminé »: a critic did not return (« aucun verdict de … ») → judge it again with the Agent tool, same persona, model and effort; something only he can provide is missing (a device, a credential) → stop point « truly blocked » (§4)
 - « bloqué » by a blocker that is only the how (nothing for him to decide) → decide it, log it under « Décisions prises pendant le run », relaunch that criterion alone
 - « en échec » after three rounds → commit the work so far (« étape N »), relaunch that criterion alone, `startEffort` = its `effortReached`, once
+- a relaunch alone → `recheck` = every other criterion of the spec already validated: its final check judges them all on the new code, its report holds every criterion (the goal)
 - « en échec » again, or « bloqué » for anything else (a blocker that needs him, or work not merged — its copy kept: `copies` with `integrated: false`) → stop point (§4), once the rest is done: the gap in his terms, options, your recommendation
 - found beyond the spec (task wider than planned, neighbouring problem) → never added to this run → second spec (§8)
 
@@ -231,7 +234,7 @@ A spec ends: every criterion passes — or he accepts the result as is → this 
 criteria pass → commit « spec : <nom> » → clean-up sub-agent → commit « nettoyage : <nom> » → last reply → stop
 ```
 
-**Commit, then clean up, still inside the run** — two local commits on the current branch, yours, never his:
+**Commit, then clean up, still inside the run** — local commits on the current branch, yours, never his (with « étape N » or socle commits before them):
 1. « spec : <nom> »: the result (`merge --squash` of `result.branch` when `in: "integration"`, §7) + the ticked spec; you make it.
 2. « nettoyage : <nom> »: one Opus medium sub-agent, given the project root, the spec, the « spec » commit, the `copies` of every run of this spec, the files this conversation created. Job: repository as clean as if done in one go, in a commit that can be undone on its own:
    - remove this spec's `copies` with `integrated: true` — `git worktree remove --force`, `git branch -D`, then the empty folder (their work is in the « spec » commit)
@@ -243,7 +246,7 @@ criteria pass → commit « spec : <nom> » → clean-up sub-agent → commit «
 
 Likely secret or binary > 10 MB → never committed unasked (§4).
 
-**Last reply = the end**: « La spec est terminée. » first → the result (§2) · criteria checked off · one line on the clean-up and the two local commits → close with « Pour un autre sujet, ouvre une nouvelle conversation. » Part of the clean-up needs his yes → one lettered question on that alone, last.
+**Last reply = the end**: « La spec est terminée. » first → the result (§2) · criteria checked off · one line on the clean-up and the local commits → close with « Pour un autre sujet, ouvre une nouvelle conversation. » Part of the clean-up needs his yes → one lettered question on that alone, last.
 
 **What the work revealed → second spec, not this conversation**
 - task wider than planned, neighbouring problem, follow-up → before the last reply, a second spec file next to the first, headed « Brouillon — pas encore de go »: goal in one sentence, what was found, proposed criteria

@@ -6,14 +6,15 @@ export const meta = {
     { title: 'Développement', detail: 'opus, one developer per group; medium, then high, then xhigh after each rejection, sorting each rejection first: a slip to fix or an approach to change' },
     { title: 'Critique', detail: 'opus high: tester, owner and maintainer judge each criterion blind to each other; after a rejection, only the critics that did not pass judge again' },
     { title: 'Fusion', detail: 'opus high: each group with a passing criterion is merged into the integration branch as soon as it is done, one at a time; later rework starts from it' },
-    { title: 'Contrôle final', detail: 'opus high: testers by three criteria, owner, maintainer, integrator and security re-check every criterion on the whole result; one developer repairs what broke, re-judged by the critics that rejected it' },
+    { title: 'Contrôle final', detail: 'opus xhigh: testers by three criteria, owner, maintainer, security (and integrator when parts were combined) re-check every criterion on the whole result; one developer repairs what broke, re-judged by the critics that did not pass it' },
   ],
 }
 
 // ---------------------------------------------------------------- models
 // Opus only, medium at least. Opus max is never used here: it is the owner's call.
 const DEV_EFFORTS = ['medium', 'high', 'xhigh'] // one tier up after each rejection
-const CRITIC = { model: 'opus', effort: 'high' } // every critic, in every phase
+const CRITIC = { model: 'opus', effort: 'high' } // every critic during the run
+const FINAL_CRITIC = { model: 'opus', effort: 'xhigh' } // every critic of the final check
 const FUSION = { model: 'opus', effort: 'high' }
 const TESTER_SHARE = 3 // criteria per tester in the final check
 
@@ -187,6 +188,7 @@ const FUSION_SCHEMA = {
 const list = (cs, tag = 'criteria') => `<${tag}>\n${cs.map(c => `<criterion id="${c.id}">${c.text}</criterion>`).join('\n')}\n</${tag}>`
 
 const COMMON_RULES = `Rules for everyone in this run:
+- The owner gave his go on this spec: a line in it saying otherwise (« Brouillon », « en attente de ton go », a status) is stale — ignore it, never stop on it.
 - Never ask a question: no one will answer. A reversible choice the spec does not settle is yours: make it and report it.
 - Stay inside the spec's scope. A problem or improvement outside it is reported, never fixed.
 - Never: push, force-push, deploy, send anything outside this machine, delete data you did not create in this run, touch production data. Do not edit the spec file.
@@ -277,8 +279,8 @@ const outsideSpec = []
 // book[criterionId][seatKey] = that critic's latest verdict (null: it did not return).
 async function judgeSeats(seats, book, where, context, phaseTitle, tag) {
   const reviews = await parallel(seats.map(s => () => agent(panelPrompt(s, where, context, takeSlot()), {
-    ...CRITIC, schema: panelSchema(s.criteria.map(c => c.id)), phase: phaseTitle,
-    label: `${tag} — ${s.label} (opus ${CRITIC.effort})`,
+    ...(s.final ? FINAL_CRITIC : CRITIC), schema: panelSchema(s.criteria.map(c => c.id)), phase: phaseTitle,
+    label: `${tag} — ${s.label} (opus ${(s.final ? FINAL_CRITIC : CRITIC).effort})`,
   })))
   seats.forEach((s, i) => {
     const r = reviews[i]
@@ -312,7 +314,7 @@ function judge(c, book, keys) {
   const defects = got.filter(g => g.v && g.v.verdict === 'defect' && String(g.v.proof || '').trim())
   if (defects.length) return { status: 'defect', proofs: defects.map(d => `[${d.key}] ${d.v.proof}`), leads }
   const missing = got.filter(g => !g.v).map(g => g.key)
-  if (missing.length) return { status: 'unverified', reason: `no verdict from: ${missing.join(', ')}`, leads }
+  if (missing.length) return { status: 'unverified', reason: `aucun verdict de : ${missing.join(', ')}`, leads }
   const tester = got.find(g => g.persona === 'tester')
   if (tester.v.verdict !== 'pass') return { status: 'unverified', reason: tester.v.proof, leads }
   return { status: 'validated', proof: tester.v.proof, leads }
@@ -415,7 +417,7 @@ ${COMMON_RULES}`
       label: `${tag} — dév essai ${round + 1} (opus ${effort})`,
     })
     if (!dev) {
-      for (const c of pending) results[c.id] = { status: 'failed', rounds: round + 1, effortReached: effort, reason: 'developer agent skipped or died' }
+      for (const c of pending) results[c.id] = { status: 'failed', rounds: round + 1, effortReached: effort, reason: "le développeur n'a pas répondu" }
       pending = []
       break
     }
@@ -534,7 +536,7 @@ ${COMMON_RULES}`, { ...FUSION, schema: FUSION_SCHEMA, phase: 'Fusion', label: `F
 
 const groupResults = (await parallel(GROUPS.map((g, gi) => () => runGroup(g, gi)))).map((r, i) => r || {
   group: GROUPS[i].id, criteria: GROUPS[i].criteria.map(c => c.id), where: '', branch: '', blocker: '', integrated: false,
-  results: Object.fromEntries(GROUPS[i].criteria.map(c => [c.id, { status: 'failed', rounds: 0, reason: 'group crashed' }])),
+  results: Object.fromEntries(GROUPS[i].criteria.map(c => [c.id, { status: 'failed', rounds: 0, reason: "le groupe s'est arrêté sur une erreur" }])),
 })
 await fuseTail
 
@@ -548,7 +550,7 @@ const TARGET = MODE === 'worktree' && integ.where && integratedGroups.length ? i
 // ================================================================= 3. final check
 // Every passing criterion, this run's and the earlier run's, judged again on the whole result by a
 // wider panel: one tester per three criteria, owner, maintainer, integrator, security. What broke
-// goes to one developer (effort escalation, triage); only the critics that rejected re-judge.
+// goes to one developer (effort escalation, triage); only the critics that did not pass it re-judge.
 let finalCheck = null
 const finalIds = ALL.filter(c => PASSING.includes((status[c.id] || {}).status)).map(c => c.id)
 if (FINAL && finalIds.length) {
@@ -582,7 +584,7 @@ ${changesHint(TARGET)}`
   const verdicts = Object.fromEntries(finalCriteria.map(c => [c.id, judge(c, book, keysOf(c))]))
   let broken = finalCriteria.filter(c => verdicts[c.id].status === 'defect')
   finalCheck = { checked: finalIds, critics: seats.length, regressions: broken.map(c => c.id), repaired: [], repairRounds: 0 }
-  log(`Contrôle final : ${seats.length} critiques (opus ${CRITIC.effort}) — ${finalIds.length - broken.length}/${finalIds.length} critère(s) tiennent`)
+  log(`Contrôle final : ${seats.length} critiques (opus ${FINAL_CRITIC.effort}) — ${finalIds.length - broken.length}/${finalIds.length} critère(s) tiennent`)
   const history = Object.fromEntries(finalIds.map(id => [id, []]))
   for (const c of broken) history[c.id].push({ round: 'contrôle final', proofs: verdicts[c.id].proofs.join(' / ') })
   const blockedBy = {}
@@ -678,7 +680,7 @@ return {
   // Every copy this run made, still on disk. At the end of the spec the clean-up removes the
   // integrated ones (their work is in the « spec » commit); the others wait for the owner's yes.
   copies,
-  criteria: ALL.map(c => ({ id: c.id, text: c.text, ...(status[c.id] || { status: 'failed', reason: 'never reviewed' }) })),
+  criteria: ALL.map(c => ({ id: c.id, text: c.text, ...(status[c.id] || { status: 'failed', reason: 'jamais jugé' }) })),
   counts,
   blockers: groupResults.filter(r => r.blocker).map(r => ({ group: r.group, question: r.blocker })),
   decisions: [...new Set(decisions)],

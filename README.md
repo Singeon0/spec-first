@@ -25,7 +25,7 @@ stop.
 During the run the main agent is an orchestrator: it cuts the work into
 what can run at the same time and fans it out through the Workflow tool.
 Every sub-agent is Opus, medium at least: Opus medium for real work, Opus
-high for every critic and the fusion, high then xhigh for a developer after
+high for every critic of the run and the fusion, Opus xhigh for every critic of the final check, high then xhigh for a developer after
 each rejection. Never Sonnet, Haiku or Fable, never Opus max.
 
 Criteria are cut fine — one observable behaviour each — so that more of
@@ -38,8 +38,8 @@ tester instead):
 | Developer, one per criterion (two share one only when one can't be checked without the other) | Opus medium → high → xhigh after each rejection |
 | Critics: tester, owner's advocate, maintainer, blind to each other; after a rejection only those that did not pass judge again | Opus high |
 | Fusion, group by group as soon as each is done, into one integration branch that later rework starts from | Opus high |
-| Final check of every criterion on the whole result: one tester per three criteria, owner's advocate, maintainer, integrator, security | Opus high |
-| Repair, if the final check finds a criterion broken — only the critics that rejected judge again | Opus medium → high → xhigh |
+| Final check of every criterion on the whole result: one tester per three criteria, owner's advocate, maintainer, security, and an integrator when parts were combined | Opus xhigh |
+| Repair, if the final check finds a criterion broken — only the critics that did not pass it judge again | Opus medium → high → xhigh |
 
 After a rejection the developer first sorts the cause: a slip is fixed at
 the root, an approach that can't satisfy the criterion is replaced, never
