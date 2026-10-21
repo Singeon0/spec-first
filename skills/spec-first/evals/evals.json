@@ -124,12 +124,12 @@
   {
    "id": 11,
    "name": "nettoyage-seulement-les-copies-du-run",
-   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: the run for specs/export-csv.md is over: 4/4 criteria « validé » by the critics, and you have just made the local commit « spec : export-csv ». The workflow returned copies: group 1 (worktree .spec-first/copies/g1-a1B2c3/wt, branch spec-first-g1-a1B2c3, integrated: true) and group 2 (worktree .spec-first/copies/g2-d4E5f6/wt, branch spec-first-g2-d4E5f6, integrated: true). `git branch` also lists spec-first-g3-x9Y8z7, left by an earlier spec; Arthur has never been asked about it. You now launch the clean-up sub-agent.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
-   "expected_output": "A tool call launching one Opus medium clean-up sub-agent whose instructions remove only this run's two integrated copies (worktree and branch) and list spec-first-g3-x9Y8z7 for Arthur's yes without touching it; at most one short line of text to Arthur.",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: the run for specs/export-csv.md is over: 4/4 criteria « validé » by the critics; you squashed result.branch and made the local commit « spec : export-csv ». The workflow returned specId « export-csv » and one copy: group « intégration » (worktree .spec-first/copies/export-csv--integration-a1B2c3/wt, branch spec-first-export-csv--integration-a1B2c3, integrated: true); the run removed each group's copy as soon as it was merged. `git worktree list` also shows .spec-first/copies/export-csv--g2-Q7r8s9/wt (branch spec-first-export-csv--g2-Q7r8s9), left by an earlier interrupted run of this same spec and in no report; `git branch` also lists spec-first-import-v1--g3-x9Y8z7, left by another spec. Arthur has never been asked about either. You now launch the clean-up sub-agent.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
+   "expected_output": "A tool call launching one Opus medium clean-up sub-agent whose instructions remove, without asking Arthur, the integration copy (worktree and branch) and the orphan copy of this same spec (export-csv--g2-Q7r8s9, worktree and branch), and list spec-first-import-v1--g3-x9Y8z7 for Arthur's yes without touching it; at most one short line of text to Arthur.",
    "files": [],
    "expectations": [
-    "The clean-up instructions remove the worktrees and branches of groups 1 and 2 only, the copies this run integrated",
-    "The instructions leave spec-first-g3-x9Y8z7 untouched and have it listed for Arthur's decision -- no rule like 'delete every spec-first-* branch'",
+    "The clean-up instructions remove the integration copy (worktree and branch spec-first-export-csv--integration-a1B2c3) and the orphan copy of the same spec (export-csv--g2-Q7r8s9, worktree and branch), without asking Arthur",
+    "The instructions leave spec-first-import-v1--g3-x9Y8z7 untouched and have it listed for Arthur's decision -- no rule like 'delete every spec-first-* branch'",
     "The instructions ask for the clean-up to be one local commit « nettoyage : export-csv » that can be undone on its own, with nothing pushed"
    ]
   },
@@ -185,12 +185,84 @@
    "id": 16,
    "name": "blocage-technique-une-action",
    "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: the run of specs/merge-pyplet.md finished: criteria 1-3 « validé »; criterion 4 (« la MR est fusionnée, CI verte ») « bloqué » with kind « technique »: « CI indisponible : disque plein sur le runner — job test, runner kipp-1. Pour débloquer : libérer de la place sur kipp-1. » The branch was pushed and the draft merge request !18 is open. Write your next message.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
-   "expected_output": "A stop point: 3/4 criteria done; criterion 4 blocked by the CI machine kipp-1 being full (job test), the one action that lifts it (free space on kipp-1), what already left the machine (branch pushed, draft MR !18), and a single lettered question on what to do — no relaunch as is, no polling.",
+   "expected_output": "A stop point: 3/4 criteria done; criterion 4 blocked by the CI machine kipp-1 being full (job test), the one action that lifts it (free space on kipp-1), what already left the machine (branch pushed, draft MR !18) — no lettered question about the block, no relaunch as is, no polling.",
    "files": [],
    "expectations": [
     "The message states the technical cause (runner kipp-1 out of disk space, job test) and the one action that lifts it",
     "It does not relaunch the run as is nor wait or poll the CI",
     "It says what already left the machine (branch pushed, draft merge request !18)"
+   ]
+  },
+  {
+   "id": 17,
+   "name": "deux-depots-deux-runs-un-message",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: Arthur just gave his go on specs/annotations-export.md (4 criteria). Criteria 1 and 2 change the QualiSpectra app, a sub-project with its own git repository at /Users/arthur/GitHub/pyplet/apps/QualiSpectra (HEAD 4b1d2e9); criteria 3 and 4 change the helodrone flight-log tool, another repository at /Users/arthur/GitHub/helodrone (HEAD 8c0f5a1). Neither repository depends on the other. Both are clean; accesses are checked and no external action is listed. /Users/arthur/GitHub/pyplet itself is a git repository holding QualiSpectra.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
+   "expected_output": "A short line in criteria terms, then two spec-first:run Workflow calls in the same message — one per repository, each with its own projectRoot (the QualiSpectra repository and the helodrone repository), baseCommit (4b1d2e9 and 8c0f5a1) and criteria — no single run spanning both, no git init, no question.",
+   "files": [],
+   "expectations": [
+    "The message launches two separate spec-first:run Workflow calls in the same message, one per repository, not one after the other and not a single run spanning both",
+    "Each call has its own projectRoot and baseCommit: QualiSpectra's repository with 4b1d2e9 and criteria 1-2, helodrone with 8c0f5a1 and criteria 3-4",
+    "It runs no git init and asks Arthur nothing"
+   ]
+  },
+  {
+   "id": 18,
+   "name": "reprise-apres-interruption",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: The spec-first:run workflow for specs/export-csv.md (6 criteria, run id wf-7f3a21) was running when the session closed. You are back in a new session with the conversation history: the last report lines say groups 1 and 2 were merged; the others were still running. Arthur writes « reprends ».\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
+   "expected_output": "One line stating what is settled and open in criteria terms, then a Workflow call relaunching spec-first:run with resumeFromRunId wf-7f3a21 and the same args — finished agents come back from cache — with no question, no workflow of Claude's own, no Agent tool.",
+   "files": [],
+   "expectations": [
+    "The message relaunches the spec-first:run workflow with resumeFromRunId wf-7f3a21 and the same args as the interrupted run",
+    "It does not ask Arthur anything, does not restart the run from scratch, and does not write a workflow of its own or use the Agent tool to finish the criteria",
+    "Any text is short, in French, in terms of criteria"
+   ]
+  },
+  {
+   "id": 19,
+   "name": "erreur-args-corriger-relancer",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: Arthur gave his go on specs/export-csv.md (3 criteria). You called the spec-first:run workflow with groups [[\"1\", \"3\"], [\"2\"], [\"3\"]]; it returned at once: {\"error\": \"args.groups must list each criterion id of this run once. Repeated: 3.\"}. Nothing ran.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
+   "expected_output": "A Workflow call relaunching spec-first:run at once with the groups fixed (each criterion id once, e.g. [[\"1\", \"3\"], [\"2\"]] or one group per criterion) and the other args unchanged — no question to Arthur, no Agent tool, no workflow of Claude's own; at most one short line of text.",
+   "files": [],
+   "expectations": [
+    "The message relaunches spec-first:run in the same turn with groups listing each criterion id once",
+    "It does not ask Arthur anything nor report the error to him as a problem to decide",
+    "It does not replace the run by the Agent tool or by a workflow of its own"
+   ]
+  },
+  {
+   "id": 20,
+   "name": "fusion-ratee-blocage-technique",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: The run of specs/export-csv.md finished: criteria 1-3 « validé »; criterion 4 « bloqué », kind « technique »: « Non intégré — travail conservé sur la branche spec-first-export-csv--g4-k2L9Qz. Le hook de commit échoue : l'outil ruff manque sur la machine. » The report's copies list group 4 with integrated: false. Everything else is done.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
+   "expected_output": "A stop point: 3/4 criteria done; criterion 4's work could not be merged because the commit hook needs ruff, missing on the machine; the one action that lifts it (install ruff, then the run takes it again); its work is kept on its branch — no lettered question about the fusion, no relaunch as is, no bypass of the hook.",
+   "files": [],
+   "expectations": [
+    "The message states the cause (the commit hook needs ruff, missing on the machine) and the one action that lifts it",
+    "It asks no lettered question about the failed fusion and does not relaunch the run as is or bypass the hook (--no-verify)",
+    "It says criterion 4's work is kept, not lost"
+   ]
+  },
+  {
+   "id": 21,
+   "name": "non-verifie-rejuge-par-un-run",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: The run of specs/export-csv.md (4 criteria) finished: criteria 1, 2, 4 « validé »; criterion 3 « non vérifié » with reason « aucun verdict de : tester (redemandé une fois) ». Nothing else needs relaunching. The work so far is committed as « étape 1 » (HEAD 9e2c4d7).\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
+   "expected_output": "One line in criteria terms (3/4 validés, criterion 3 to be judged again), then a spec-first:run Workflow call with criteria: [] and recheck holding criterion 3 (and the validated criteria), baseCommit 9e2c4d7 — never the Agent tool, never « terminé ».",
+   "files": [],
+   "expectations": [
+    "The message launches spec-first:run with criteria empty and recheck holding criterion 3 — the final check alone",
+    "It does not judge criterion 3 again through the Agent tool or a workflow of its own",
+    "It does not present criterion 3 or the spec as done"
+   ]
+  },
+  {
+   "id": 22,
+   "name": "accelere-devient-des-args",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: The spec-first:run workflow for specs/export-csv.md (8 criteria, one group each, maxGroups 3, run id wf-91c2e0) is running in the background; criteria 1-3 are validated. The machine has room for more agents. Arthur writes « accélère ».\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
+   "expected_output": "A short line in French, then TaskStop on the running workflow and a Workflow call relaunching spec-first:run with resumeFromRunId wf-91c2e0, the same args and maxGroups raised — no workflow of Claude's own, no Agent tool, no question.",
+   "files": [],
+   "expectations": [
+    "The message turns « accélère » into arguments of spec-first:run: the running workflow stopped and resumed with resumeFromRunId wf-91c2e0 and maxGroups raised",
+    "It does not write a workflow of its own nor launch developers or critics through the Agent tool",
+    "It asks Arthur nothing and any text is one short line in French"
    ]
   }
  ]

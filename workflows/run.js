@@ -1,7 +1,7 @@
 export const meta = {
   name: 'run',
   description: 'spec-first autonomous run: small groups of criteria, a few at a time, each developed in its own copy; three Opus high critics per round, and after a rejection only the critics that did not pass re-judge; developer effort escalation with triage; each validated group merged at once into an integration branch that later groups and rework start from, its copy then removed; reinforced final check of every criterion, repaired by one developer; then, only if the owner authorized it with his go, the external actions he listed (push, merge request, CI, merge, tag, release), checked from outside',
-  whenToUse: 'Called by the spec-first skill after the owner gave his go on a spec. args: { specPath, projectRoot, baseCommit, criteria: [{ id, text }], groups?: [[ids]], testCommand?, quickTestCommand?, setupCommand?, subdir?, finalCheck?: boolean, recheck?: [{ id, text }], startEffort?: { [id]: "medium"|"high"|"xhigh" }, specBaseCommit?, integrationBranch?, maxGroups?: number, exclusive?: [string], publish?: { actions: string, criteria: [ids] }, budget?: number } with absolute paths. baseCommit is required: `git rev-parse HEAD` in projectRoot right before the call. Each group works in its own git worktree under <projectRoot>/.spec-first/copies, named after the spec; at most maxGroups groups (default 3) are active at once, the others wait; groups omitted → one group per criterion. Every validated group is merged into one integration branch, which the skill squashes into the project at the end. testCommand: the full test suite, run once in the final check; quickTestCommand: the targeted tests used during the run. setupCommand: makes a fresh copy runnable, commit hooks included; subdir: the sub-folder of projectRoot where setup and tests run. finalCheck: false skips the final check (first run of a two-run spec); recheck: criteria an earlier run of the same spec validated, judged again in the final check; criteria empty with recheck → final check only. startEffort: the effort a relaunched criterion resumes from. specBaseCommit: the commit the whole spec started from (two-run spec), read by the final security and maintainer critics. integrationBranch: the integration branch of an interrupted run to start from (its criteria go in recheck). exclusive: resources only one agent may use at a time. publish: the external actions the owner authorized with his go and the criteria they make true, applied after the final check. budget: output tokens; the run stops cleanly before it. Not for a bare slash-command call without args: tell the user to run /spec-first instead.',
+  whenToUse: 'Called by the spec-first skill after the owner gave his go on a spec. args: { specPath, projectRoot, baseCommit, criteria: [{ id, text }], groups?: [[ids]], testCommand?, quickTestCommand?, setupCommand?, subdir?, finalCheck?: boolean, recheck?: [{ id, text }], startEffort?: { [id]: "medium"|"high"|"xhigh" }, specBaseCommit?, integrationBranch?, maxGroups?: number, exclusive?: { [resource]: [ids] } | [string], publish?: { actions: string, criteria: [ids] }, budget?: number } with absolute paths. baseCommit is required: `git rev-parse HEAD` in projectRoot right before the call. An integration copy is made first; each group works in its own git worktree under <projectRoot>/.spec-first/copies, named after the spec, made from the integration branch; at most maxGroups groups (default 3) are active at once, the others wait; groups omitted → one group per criterion. Every validated group is merged into one integration branch, which the skill squashes into the project at the end. testCommand: the full test suite, run only in the final check; quickTestCommand: the targeted tests developers, critics and fusions run. setupCommand: makes a fresh copy runnable, commit hooks included; subdir: the sub-folder of projectRoot where setup and tests run. finalCheck: false skips the final check (first run of a two-run spec); recheck: criteria an earlier run of the same spec validated, judged again in the final check; criteria empty with recheck → final check only. startEffort: the effort a relaunched criterion resumes from. specBaseCommit: the commit the whole spec started from (two-run spec), read by the final security and maintainer critics. integrationBranch: the integration branch of an interrupted run to start from (its criteria go in recheck). exclusive: resources only one agent may use at a time, each with the criteria that need it (a plain list: every criterion) — the run holds the locks. publish: the external actions the owner authorized with his go and the criteria they make true, applied after the final check; a publication criterion held only by other criteria comes back blocked with kind « attente »: relaunch it in recheck with the same publish. budget: output tokens; the run stops cleanly before it. Not for a bare slash-command call without args: tell the user to run /spec-first instead.',
   phases: [
     { title: 'Développement', detail: 'opus, one developer per group, a few groups at a time; medium, then high, then xhigh after each rejection, sorting each rejection first: a slip to fix or an approach to change' },
     { title: 'Critique', detail: 'opus high: tester, owner and maintainer judge each criterion blind to each other; after a rejection, only the critics that did not pass judge again' },
@@ -105,8 +105,24 @@ if (input.maxGroups != null) {
   if (n >= 1) MAX_GROUPS = n
   else log(`maxGroups ignoré (« ${input.maxGroups} ») : 3 groupes à la fois.`)
 }
-const EXCLUSIVE = Array.isArray(input.exclusive) ? [...new Set(input.exclusive.map(s => String(s).trim()).filter(Boolean))] : []
-if (input.exclusive != null && !Array.isArray(input.exclusive)) log('exclusive ignoré : ce doit être une liste.')
+// Resources only one agent may use at a time, each with the criteria that need it. The run holds
+// the locks itself, as for the fusions: no agent waits in a shell, a stopped run leaves no stale lock.
+// A plain list → every criterion needs each resource.
+const EXCLUSIVE = {} // resource → ids of the criteria that need it
+if (Array.isArray(input.exclusive)) {
+  for (const s of input.exclusive) { const r = String(s).trim(); if (r) EXCLUSIVE[r] = ALL.map(c => c.id) }
+} else if (input.exclusive && typeof input.exclusive === 'object') {
+  for (const [k, v] of Object.entries(input.exclusive)) {
+    const r = String(k).trim()
+    const asked = (Array.isArray(v) ? v : [v]).map(String)
+    const unknown = asked.filter(id => !byId[id])
+    if (unknown.length) log(`exclusive « ${r} » : critère(s) inconnu(s) ignoré(s) : ${unknown.join(', ')}.`)
+    const ids = asked.filter(id => byId[id])
+    if (r && ids.length) EXCLUSIVE[r] = [...new Set(ids)]
+  }
+} else if (input.exclusive != null) log('exclusive ignoré : ce doit être une liste de ressources, ou { ressource: [ids des critères] }.')
+const RESOURCES = Object.keys(EXCLUSIVE).sort()
+const locksFor = ids => RESOURCES.filter(r => EXCLUSIVE[r].some(id => ids.includes(id)))
 const LIMIT = Number(input.budget) > 0 ? Number(input.budget) : 0
 if (input.budget != null && !LIMIT) log('budget ignoré : ce doit être un nombre de tokens.')
 
@@ -118,12 +134,6 @@ if (input.startEffort && typeof input.startEffort === 'object') {
     else log(`startEffort ignoré pour « ${id} » : ${byId[id] ? `effort « ${e} » inconnu` : 'critère inconnu'}.`)
   }
 }
-
-// Every agent gets its own ten ports, so servers started at the same time never collide.
-let nextSlot = 0
-const takeSlot = () => nextSlot++
-const portsFor = slot => { const a = 20000 + 10 * (slot % 4500); return `${a}-${a + 9}` }
-const portRule = slot => `Ports: anything you start that listens (a server, a service) uses only ports ${portsFor(slot)}, and you stop it before you return.`
 
 // Groups come from the orchestrator, cut fine: one group per criterion unless two cannot be
 // checked apart. Groups may touch the same files: the fusion resolves the conflicts.
@@ -153,6 +163,17 @@ if (input.groups != null && CRITERIA.length) {
   if (big) log(`${big} groupe(s) de plus de 3 critères : plus lents à aboutir.`)
 }
 const GROUPS = groupIds.map((ids, i) => ({ id: String(i + 1), criteria: ids.map(id => byId[id]) }))
+
+// Every agent gets its own ten ports, from its group, its role and its round — never from the order
+// agents finish in — so a resumed run (resumeFromRunId) gives each agent the same prompt again.
+// Offset by the project: two runs at once on two repositories do not collide.
+const hashOf = s => { let h = 2166136261; for (const ch of String(s)) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619) >>> 0 } return h }
+const PORT_BASE = (hashOf(ROOT) % 9) * 500
+const groupSlot = (gid, k) => 16 * Number(gid) + k // k: 0-2 developer round, 3-11 critics (3 per round), 12 fusion
+const FINAL_SLOT = 16 * (GROUPS.length + 1) // final check: one per critic, then 90+ the repair
+const PUB_SLOT = FINAL_SLOT + 100 // publication: 0-2 the publisher, 5 its tester
+const portsFor = slot => { const a = 20000 + 10 * ((PORT_BASE + slot) % 4500); return `${a}-${a + 9}` }
+const portRule = slot => `Ports: anything you start that listens (a server, a service) uses only ports ${portsFor(slot)}, and you stop it before you return.`
 
 // Token budget: the run stops launching work before the limit and returns a partial report.
 let stopped = ''
@@ -352,14 +373,38 @@ const PUB_SCHEMA = {
 const list = (cs, tag = 'criteria') => `<${tag}>\n${cs.map(c => `<criterion id="${c.id}">${c.text}</criterion>`).join('\n')}\n</${tag}>`
 const clean = p => String(p || '').replace(/\/+$/, '')
 const kindOf = b => String(b).startsWith(TECH) || String(b).startsWith(ISOLATION) ? 'technique' : 'question'
+const errText = e => String((e && e.message) || e || 'erreur inconnue').slice(0, 200)
+
+// The run's own locks on the exclusive resources: one agent at a time, released when the agent
+// returns or fails, taken in a fixed order so two agents never wait on each other.
+const lockTail = {}
+async function withLocks(rs, fn) {
+  const held = []
+  try {
+    for (const r of [...new Set(rs || [])].sort()) {
+      const prev = lockTail[r] || Promise.resolve()
+      let release
+      const mine = new Promise(res => { release = res })
+      lockTail[r] = prev.then(() => mine)
+      await prev
+      held.push(release)
+    }
+    return await fn()
+  } finally {
+    for (const release of held) release()
+  }
+}
 
 // agent() returns null when the owner skipped the agent or it died after the tool's own retries.
-// Such a breakdown is not a failed round: the same agent is launched once more.
+// Such a breakdown is not a failed round: the same agent is launched once more, locks still held.
 async function ask(prompt, opts) {
-  const r = await agent(prompt, opts)
-  if (r) return r
-  log(`${opts.label} : pas de réponse, relancé une fois`)
-  return agent(prompt, { ...opts, label: `${opts.label} — relance` })
+  const { locks, ...o } = opts
+  return withLocks(locks, async () => {
+    const r = await agent(prompt, o)
+    if (r) return r
+    log(`${o.label} : pas de réponse, relancé une fois`)
+    return agent(prompt, { ...o, label: `${o.label} — relance` })
+  })
 }
 
 // Copies live in the project, under a folder git is told to ignore locally (.git/info/exclude),
@@ -380,12 +425,18 @@ const DROP = `only these, when ${BASE} did not track them: local config copied i
 // What changed in a tree since the run started.
 const changesHint = tree => `Changes of this run: \`git -C ${tree} diff ${BASE}\` (the commit the run started from), plus the files \`git -C ${tree} status --porcelain\` lists as untracked (??). The spec file is not part of the change.`
 
-// The full suite runs once per panel, in the background, into a log the other critics can read.
-const suitePath = name => `${ROOT}/.spec-first/logs/${SPEC_ID}-${name}.log`
-const suiteCommand = (at, file) => `${ENSURE_HIDDEN} && mkdir -p .spec-first/logs && (cd "${at}" && ${testCommand}) > "${file}" 2>&1; echo "EXIT $?" >> "${file}"`
+// The full suite runs only in the final check, once per panel, in the background, into a log the other
+// critics read. The log's name is unique to this run — its arguments, and its integration copy, made
+// with a random name — and the same when the run is resumed: a stale « EXIT » is never read.
+const ARGS_TAG = hashOf(JSON.stringify(input)).toString(36)
+const copyTag = ws => (String(ws).split('/').slice(-2, -1)[0] || '').split('-').pop()
+const suitePath = name => `${ROOT}/.spec-first/logs/${SPEC_ID}-${ARGS_TAG}${integ.where ? `-${copyTag(integ.where)}` : ''}-${name}.log`
+const suiteCommand = (at, file) => `${ENSURE_HIDDEN} && mkdir -p .spec-first/logs && rm -f "${file}" && (cd "${at}" && ${testCommand}) > "${file}" 2>&1; echo "EXIT $?" >> "${file}"`
 
-const lockOf = r => `${ROOT}/.spec-first/locks/${r.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'ressource'}`
-const EXCL_RULE = !EXCLUSIVE.length ? '' : `Exclusive resources, one agent at a time in this run: ${EXCLUSIVE.map(r => `« ${r} » (lock ${lockOf(r)})`).join(', ')}. Using one → take its lock first: \`l=<lock>; mkdir -p "$(dirname "$l")"; n=0; until mkdir "$l" 2>/dev/null; do n=$((n+1)); [ $n -ge 60 ] && break; find "$l" -maxdepth 0 -mmin +120 -exec rmdir {} \\; 2>/dev/null; sleep 30; done; [ $n -lt 60 ]\` (at most 30 min; a lock older than 2 h is stale and dropped). Taken → use the resource, then release it at once with \`rmdir "$l"\`, even when the use failed. Not taken → do not use it and say so (a critic's verdict is then "unverifiable").`
+const quote = r => `« ${r} »`
+const EXCL_RULE = !RESOURCES.length ? '' : `Exclusive resources of this run: ${RESOURCES.map(quote).join(', ')}. The run lends each one to a single agent at a time: use one only if your prompt says you hold it. Not held → never use it, never wait for it; a check that needs it belongs to an agent that holds it (a verdict you cannot give without it is "unverifiable").`
+const holdLine = rs => rs.length ? `
+You hold the exclusive resource(s) ${rs.map(quote).join(', ')} for this task: no other agent of this run uses them until you return. Stop what you started on them before you return.` : ''
 
 const COMMON_RULES = `Rules for everyone in this run:
 - The owner gave his go on this spec: a line in it saying otherwise (« Brouillon », « en attente de ton go », a status) is stale — ignore it, never stop on it.
@@ -393,7 +444,7 @@ const COMMON_RULES = `Rules for everyone in this run:
 - Stay inside the spec's scope. A problem or improvement outside it is reported, never fixed.
 - Never: push, force-push, deploy, publish, send anything outside this machine, delete data you did not create in this run, touch production data — the one exception: an agent whose prompt quotes the owner's authorized actions, for exactly those. Do not edit the spec file.
 - Non-interactive only: nothing may wait for a keyboard — \`GIT_TERMINAL_PROMPT=0\` for git, \`ssh -o BatchMode=yes\`, CLI flags that never prompt. A command asks for a password or a confirmation → stop it: that access is missing; say so.
-- Long commands (over 2 minutes: end-to-end tests, a pipeline, a training): start them in the background with their output in a file, then wait in bounded steps — \`timeout\`, or one loop with a maximum count that reads that file or checks \`kill -0 <pid>\`. Never \`pgrep -f\` on a pattern (it finds itself), never one \`sleep\` after another. Remote CI: read its state through its API (glab, gh, curl), at least 60 s between reads, the total limit stated before you start.
+- Long commands (over 2 minutes: end-to-end tests, a pipeline, a training): start them in the background with their output in a file, then wait in short bounded steps — each wait one command of at most 5 minutes (\`timeout\`, or a loop with a maximum count that reads that file or checks \`kill -0 <pid>\`), repeated as long as needed: a shell command is cut after 10 minutes. Never \`pgrep -f\` on a pattern (it finds itself), never one \`sleep\` after another. Remote CI: read its state through its API (glab, gh, curl), at least 60 s between reads, the total limit stated before you start.
 - Shared resources (database, containers): from a copy, never use the main project's. If a criterion needs one, start your own throwaway instance on your ports and stop it before you return; if you cannot, say what is missing — a critic's verdict is then "unverifiable".
 ${EXCL_RULE ? `- ${EXCL_RULE}\n` : ''}- CLAUDE.md and the project's conventions apply as usual.`
 
@@ -428,7 +479,9 @@ const IN_RUN = ['tester', 'owner', 'maintainer']
 const personaOf = key => key.split('-')[0]
 const seatDef = (key, extra = {}) => ({ key, persona: personaOf(key), label: PERSONAS[personaOf(key)].label, ...extra })
 
-// Tests: targeted during the run; the full suite once per panel, by one critic, shared through a log.
+// Tests: targeted during the run; the full suite only in the final check, once per panel, by one
+// critic, shared through a log. Without a final check, the next run's final check runs it.
+const FULL_SUITE_WHEN = FINAL ? 'in the final check' : 'in the final check of the next run of this spec'
 function testsFor(seat, where) {
   const at = inSub(where)
   if (seat.publication) return 'Do not run the project tests: the final check did.'
@@ -438,13 +491,17 @@ function testsFor(seat, where) {
   const targeted = quickTestCommand ? `targeted tests only — \`${quickTestCommand}\` from ${at}, or narrower` : 'only the tests that cover your criteria'
   const full = !testCommand ? ''
     : seat.suiteLog ? ` Never run the full suite yourself: another critic runs it once into ${seat.suiteLog}, complete when its last line is "EXIT <code>" — read it there if you need it.`
-      : ' Never run the full suite: it runs once, in the final check.'
+      : ` Never run the full suite: it runs only ${FULL_SUITE_WHEN}.`
   return `Project tests: ${targeted}.${full}`
 }
 
+// Who holds the exclusive resources: a tester, for its criteria — the one running the full suite
+// holds them all. The other critics read and judge without them.
+const seatLocks = s => s.persona !== 'tester' ? [] : s.fullSuite ? RESOURCES : locksFor(s.criteria.map(c => c.id))
+
 // A seat = one critic judging some criteria. fullSuite: the one seat of a panel that runs the whole
-// test suite. previous: its own earlier verdicts, when it judges again after a rework.
-function panelPrompt(seat, where, context, slot) {
+// test suite. previous: its own earlier verdicts, when it judges again after a rework. slot: its ports.
+function panelPrompt(seat, where, context) {
   const p = PERSONAS[seat.persona]
   const previous = seat.previous && seat.previous.length ? `
 <your_previous_verdicts>
@@ -470,7 +527,7 @@ ${context}${specDiff}${pubNote}
 ${testsFor(seat, where)}
 
 Do not edit source files under ${ROOT} or ${where}. Build outputs, caches and servers the project's own commands create are fine. Scratch files go in a fresh \`mktemp -d\` directory only.
-${portRule(slot)}
+${portRule(seat.slot)}${holdLine(seatLocks(seat))}
 
 One verdict per criterion above, keyed by its id:
 - "pass": you checked it and it holds — proof says what you ran or read and what you saw;
@@ -486,10 +543,11 @@ const outsideSpec = []
 // A critic that did not answer, or left a criterion without verdict, is asked once more before
 // the criterion is reported « non vérifié ».
 async function judgeSeats(seats, book, where, context, phaseTitle, tag) {
-  const launch = list => parallel(list.map(s => () => agent(panelPrompt(s, where, context, takeSlot()), {
+  // A retry runs after the first round of its panel: it keeps its seat's ports.
+  const launch = list => parallel(list.map(s => () => withLocks(seatLocks(s), () => agent(panelPrompt(s, where, context), {
     ...(s.final ? FINAL_CRITIC : CRITIC), schema: panelSchema(s.criteria.map(c => c.id)), phase: phaseTitle,
     label: `${tag} — ${s.label} (opus ${(s.final ? FINAL_CRITIC : CRITIC).effort})${s.retry ? ' — relance' : ''}`,
-  })))
+  }))))
   const record = (list, reviews) => list.forEach((s, i) => {
     const r = reviews[i]
     if (r) for (const o of r.outsideSpec || []) outsideSpec.push(o)
@@ -562,14 +620,13 @@ Your previous round changed nothing and returned no blocker, yet these criteria 
 // Each group works in its own git worktree, at most MAX_GROUPS at once; a group that starts late
 // starts from what is already merged. A group that is launched is judged at once.
 const PASSING = ['validated', 'unverified']
-// The in-run tester runs the full suite only when nothing else will: no final check.
-const IN_RUN_FULL_SUITE = !FINAL
 log(CRITERIA.length
   ? `${CRITERIA.length} critère(s) à développer en ${GROUPS.length} groupe(s), ${Math.min(MAX_GROUPS, GROUPS.length)} à la fois, chacun dans sa copie${RECHECK.length ? `, ${RECHECK.length} critère(s) d'un run précédent à rejuger` : ''}${FINAL ? '' : ', sans contrôle final'}${PUBLISH ? ', puis la publication autorisée' : ''} — ${ALL.length} critère(s) au total`
   : `Contrôle final seul : ${RECHECK.length} critère(s) à rejuger${PUBLISH ? ', puis la publication autorisée' : ''}`)
 
 const decisions = []
-const integ = { where: '', branch: '' } // the integration copy, created by the first fusion
+const integ = { where: '', branch: '', used: false } // the integration copy, made before any group starts
+let integFailed = '' // why no integration copy could be made: every group is then blocked
 const integratedGroups = []
 const fusions = []
 const ci = { started: false, ref: '', mr: '', block: null, runs: [] } // the remote CI, started early
@@ -581,19 +638,49 @@ const addFiles = (id, fs) => {
 
 // An interrupted run's integration branch: its copy holds the result, every copy starts from it.
 if (IB) {
-  const res = await ask(`You prepare the integration copy of an interrupted run of this spec, so this run goes on from it. Run:
+  let res = null
+  try {
+    res = await ask(`You prepare the integration copy of an interrupted run of this spec, so this run goes on from it. Run:
 \`${integCopyCommand}\`
 It reuses the worktree that already holds branch ${IB}, or makes a new copy of it. A new copy → prepare it: ${PREPARE}
 Commit nothing, change no tracked file. Return its path as workspace and ${IB} as branch; cannot → workspace empty and the reason in a few French words.
 
 ${COMMON_RULES}`, { ...FUSION, schema: COPY_SCHEMA, phase: 'Fusion', label: `Reprise depuis ${IB} (opus ${FUSION.effort})` })
+  } catch (e) {
+    // A breakdown, not a wrong argument: the run still returns its report.
+    integFailed = `Reprise impossible depuis ${IB} : ${errText(e)}.`
+    log(integFailed)
+  }
   const ws = clean(res && res.workspace)
-  if (!isCopy(ws)) {
+  if (!integFailed && !isCopy(ws)) {
     return { error: `args.integrationBranch: no usable copy of ${IB} — ${(res && res.reason) || 'no answer'}. Check the branch name (\`git branch --list 'spec-first-*'\`) or drop integrationBranch.` }
   }
-  integ.where = ws
-  integ.branch = IB
-  log(`Reprise depuis la branche d'intégration ${IB}`)
+  if (!integFailed) {
+    integ.where = ws
+    integ.branch = IB
+    log(`Reprise depuis la branche d'intégration ${IB}`)
+  }
+} else if (GROUPS.length && !overBudget("la copie d'intégration")) {
+  // Made first, so every group starts from its branch and every prompt is the same when the run is
+  // resumed (resumeFromRunId): the fusions never depend on which group finished first.
+  let res = null
+  try {
+    res = await ask(`You make the integration copy of this run: every group of criteria the critics validate is merged into it, and the groups start from its branch. First check that ${ROOT} is the top of a git repository (\`[ "$(git -C "${ROOT}" rev-parse --show-toplevel)" = "$(cd "${ROOT}" && pwd -P)" ]\` succeeds); if not, create nothing and say why. Otherwise run:
+\`${copyCommand('integration', BASE)}\`
+Do not prepare it: the first fusion does. Commit nothing, change no tracked file. Return its path as workspace and its branch (\`git -C <path> branch --show-current\`) as branch; cannot → workspace empty and the reason in a few French words.
+
+${COMMON_RULES}`, { ...HELPER, schema: COPY_SCHEMA, phase: 'Fusion', label: `Copie d'intégration (opus ${HELPER.effort})` })
+  } catch (e) {
+    res = { workspace: '', branch: '', reason: `erreur : ${errText(e)}` }
+  }
+  const ws = clean(res && res.workspace)
+  if (isCopy(ws) && res.branch) {
+    integ.where = ws
+    integ.branch = String(res.branch)
+  } else {
+    integFailed = `Copie d'intégration impossible : ${(res && res.reason) || "l'agent n'a pas répondu, deux fois"}.`
+    log(integFailed)
+  }
 }
 
 function workspaceRule(g, where, branch, from) {
@@ -618,12 +705,13 @@ const keepBlocked = (r, reason) => {
 async function runGroup(g) {
   const tag = `Groupe ${g.id}`
   const ids = g.criteria.map(c => c.id)
+  const locks = locksFor(ids)
   const results = {}
   const book = Object.fromEntries(ids.map(id => [id, {}]))
   const history = Object.fromEntries(ids.map(id => [id, []]))
-  const defs = Object.fromEntries(IN_RUN.map(k => [k, seatDef(k, { fullSuite: IN_RUN_FULL_SUITE && k === 'tester' })]))
+  const defs = Object.fromEntries(IN_RUN.map(k => [k, seatDef(k)]))
   const start = Math.max(0, ...ids.map(id => DEV_EFFORTS.indexOf(START[id] || DEV_EFFORTS[0])))
-  // A group that starts after a fusion starts from what is already merged.
+  // Every group starts from the integration branch: what is already merged.
   const from = integ.branch || FROM
   let pending = g.criteria.slice()
   let where = ''
@@ -631,24 +719,28 @@ async function runGroup(g) {
   let feedback = ''
   let nudge = ''
   let blocker = ''
-  for (let round = 0; round < DEV_EFFORTS.length && pending.length; round++) {
-    if (overBudget(`l'essai ${round + 1} du groupe ${g.id}`)) {
-      for (const c of pending) {
-        results[c.id] = round === 0
-          ? { status: 'blocked', kind: 'technique', rounds: 0, reason: `Arrêté : ${stopped}.` }
-          : { ...results[c.id], reason: `${results[c.id].reason || ''}\n(pas de nouvel essai : ${stopped})` }
+  let round = 0
+  // An error thrown by an agent (a hard budget, a breakdown) stops this group only: what its critics
+  // already validated, and its copy, are kept and merged as usual.
+  try {
+    for (; round < DEV_EFFORTS.length && pending.length; round++) {
+      if (overBudget(`l'essai ${round + 1} du groupe ${g.id}`)) {
+        for (const c of pending) {
+          results[c.id] = round === 0
+            ? { status: 'blocked', kind: 'technique', rounds: 0, reason: `Arrêté : ${stopped}.` }
+            : { ...results[c.id], reason: `${results[c.id].reason || ''}\n(pas de nouvel essai : ${stopped})` }
+        }
+        pending = []
+        break
       }
-      pending = []
-      break
-    }
-    const effort = DEV_EFFORTS[Math.min(start + round, DEV_EFFORTS.length - 1)]
-    const isolated = !where
-    const done = g.criteria.filter(c => !pending.includes(c))
-    // Rework starts from what is already merged, not from the run's first commit.
-    const catchUp = round > 0 && integ.branch ? `
+      const effort = DEV_EFFORTS[Math.min(start + round, DEV_EFFORTS.length - 1)]
+      const isolated = !where
+      const done = g.criteria.filter(c => !pending.includes(c))
+      // Rework starts from what is already merged, not from the run's first commit.
+      const catchUp = round > 0 && where && integ.branch ? `
 First bring in what other groups already merged, so your fix starts from it: \`git -C ${where} merge --no-edit ${integ.branch}\`. A conflict → resolve it keeping both intents, then commit. New dependencies came in → prepare your copy again. Never rebase, reset or stash.` : ''
-    const pubIds = pending.filter(c => isPub(c.id)).map(c => c.id)
-    const devPrompt = `You are the developer for part of a spec, round ${round + 1} of at most ${DEV_EFFORTS.length}.
+      const pubIds = pending.filter(c => isPub(c.id)).map(c => c.id)
+      const devPrompt = `You are the developer for part of a spec, round ${round + 1} of at most ${DEV_EFFORTS.length}.
 
 Spec: ${SPEC} — read it first (goal, criteria, out of scope).
 Your criteria:
@@ -657,91 +749,100 @@ ${done.length ? `Already validated in this group — keep them working:\n${list(
 Criteria ${pubIds.join(', ')} are publication criteria: prepare everything they need (version, changelog, files), but never push or publish — a later phase does it, with the owner's authorization.` : ''}
 
 ${workspaceRule(g, where, branch, from)}${catchUp}
-${portRule(takeSlot())}
+${portRule(groupSlot(g.id, round))}${holdLine(locks)}
 ${nudge}${feedback}
-Tests: ${quickTestCommand ? `targeted ones — \`${quickTestCommand}\`, or narrower` : 'run the ones that cover your criteria'}${SUBDIR ? `, from the copy's ${SUBDIR} folder` : ''}.${testCommand ? ' The full suite runs once, in the final check: do not run it.' : ''}
+Tests: ${quickTestCommand ? `targeted ones — \`${quickTestCommand}\`, or narrower` : 'run the ones that cover your criteria'}${SUBDIR ? `, from the copy's ${SUBDIR} folder` : ''}.${testCommand ? ` The full suite runs only ${FULL_SUITE_WHEN}: do not run it.` : ''}
 An independent panel judges every criterion on the real result.
 Never run commands that rewrite files outside your criteria (repo-wide formatters, lockfile upgrades). If you need a new dependency, add it the project's usual way and say so in your summary.
 "blocker" stays empty unless you cannot make any progress without the owner changing or clarifying the spec — or, starting with "${TECH}", a technical cause outside your changes stops you (a hook, the environment, a missing tool).
 
 ${COMMON_RULES}`
-    const dev = await ask(devPrompt, {
-      model: 'opus', effort, schema: devSchema(ids), phase: 'Développement',
-      label: `${tag} — dév essai ${round + 1} (opus ${effort})`,
-    })
-    if (!dev) {
-      // A breakdown, not a failed round: the skill relaunches it.
-      for (const c of pending) results[c.id] = { status: 'crashed', rounds: round + 1, effortReached: effort, reason: "le développeur n'a pas répondu, deux fois (panne)" }
-      pending = []
-      break
-    }
-    if (isolated) {
-      const ws = clean(dev.workspace)
-      const iso = String(dev.blocker || '').startsWith(ISOLATION)
-      if (iso || !isCopy(ws)) {
-        const why = iso ? dev.blocker.slice(ISOLATION.length).trim() : 'le développeur n’a pas rendu de copie isolée'
-        const reason = `Copie isolée impossible : ${why || 'raison inconnue'}.`
-        for (const c of pending) results[c.id] = { status: 'blocked', kind: 'technique', rounds: round + 1, reason }
-        const kept = isCopy(ws)
-        return { group: g.id, criteria: ids, where: kept ? ws : '', branch: kept ? String(dev.branch || '') : '', results, blocker: reason, kind: 'technique', integrated: false, removed: false }
-      }
-      where = ws
-      branch = String(dev.branch || '')
-    }
-    for (const id of ids) addFiles(id, dev.files)
-    for (const d of dev.decisions || []) decisions.push(d)
-    const triage = Object.fromEntries((dev.triage || []).map(t => [String(t.id), `${t.kind}: ${t.why}`]))
-    const claimsDone = pending.every(c => (dev.selfCheck || []).some(s => String(s.id) === c.id && s.status === 'pass'))
-    if (!dev.changed && !dev.blocker && !claimsDone) {
-      // Stopped without doing anything and without saying why: a new round one tier up, not a block.
-      for (const c of pending) results[c.id] = { ...(results[c.id] || {}), status: 'failed', rounds: round + 1, effortReached: effort, reason: "le développeur s'est arrêté sans rien changer" }
-      nudge = IDLE_NOTE
-      log(`${tag} : essai ${round + 1} (opus ${effort}) — rien changé, nouvel essai un cran plus haut`)
-      continue
-    }
-    nudge = ''
-    if (dev.blocker) {
-      blocker = String(dev.blocker)
-      if (!dev.changed) {
-        for (const c of pending) results[c.id] = { status: 'blocked', kind: kindOf(blocker), rounds: round + 1, effortReached: effort, reason: blocker }
+      const dev = await ask(devPrompt, {
+        model: 'opus', effort, schema: devSchema(ids), phase: 'Développement', locks,
+        label: `${tag} — dév essai ${round + 1} (opus ${effort})`,
+      })
+      if (!dev) {
+        // A breakdown, not a failed round: the skill reports it as a technical block.
+        for (const c of pending) results[c.id] = { status: 'crashed', rounds: round + 1, effortReached: effort, reason: "le développeur n'a pas répondu, deux fois (panne)" }
         pending = []
         break
       }
-    }
-    const mergedIn = from !== BASE || !!catchUp
-    const context = `<developer_claims>
+      // Stopped without doing anything and without saying why: a new round one tier up, not a block —
+      // even on a first round that made no copy at all.
+      const idle = !dev.changed && !dev.blocker
+      let noCopy = false
+      if (isolated) {
+        const ws = clean(dev.workspace)
+        const iso = String(dev.blocker || '').startsWith(ISOLATION)
+        if (!iso && !isCopy(ws) && idle) noCopy = true
+        else if (iso || !isCopy(ws)) {
+          const why = iso ? dev.blocker.slice(ISOLATION.length).trim() : 'le développeur n’a pas rendu de copie isolée'
+          const reason = `Copie isolée impossible : ${why || 'raison inconnue'}.`
+          for (const c of pending) results[c.id] = { status: 'blocked', kind: 'technique', rounds: round + 1, reason }
+          const kept = isCopy(ws)
+          return { group: g.id, criteria: ids, where: kept ? ws : '', branch: kept ? String(dev.branch || '') : '', results, blocker: reason, kind: 'technique', integrated: false, removed: false }
+        } else {
+          where = ws
+          branch = String(dev.branch || '')
+        }
+      }
+      for (const id of ids) addFiles(id, dev.files)
+      for (const d of dev.decisions || []) decisions.push(d)
+      const triage = Object.fromEntries((dev.triage || []).map(t => [String(t.id), `${t.kind}: ${t.why}`]))
+      const claimsDone = pending.every(c => (dev.selfCheck || []).some(s => String(s.id) === c.id && s.status === 'pass'))
+      if (idle && (noCopy || !claimsDone)) {
+        for (const c of pending) results[c.id] = { ...(results[c.id] || {}), status: 'failed', rounds: round + 1, effortReached: effort, reason: "le développeur s'est arrêté sans rien changer" }
+        nudge = IDLE_NOTE
+        log(`${tag} : essai ${round + 1} (opus ${effort}) — rien changé, nouvel essai un cran plus haut`)
+        continue
+      }
+      nudge = ''
+      if (dev.blocker) {
+        blocker = String(dev.blocker)
+        if (!dev.changed) {
+          for (const c of pending) results[c.id] = { status: 'blocked', kind: kindOf(blocker), rounds: round + 1, effortReached: effort, reason: blocker }
+          pending = []
+          break
+        }
+      }
+      const mergedIn = from !== BASE || !!catchUp
+      const context = `<developer_claims>
 Summary: ${dev.summary}
 Self-check: ${(dev.selfCheck || []).map(s => `[${s.id}] ${s.status}: ${s.evidence}`).join(' | ') || 'none'}
 </developer_claims>
 These are claims, not evidence.
 ${changesHint(where)}${mergedIn ? ' Work merged into this copy before (other groups, an earlier run) is part of that diff: judge only your criteria.' : ''}`
-    const panel = round === 0 ? IN_RUN.map(k => ({ ...defs[k], criteria: pending })) : recheckSeats(pending, book, () => IN_RUN, defs)
-    const shared = IN_RUN_FULL_SUITE && testCommand ? suitePath(`g${g.id}-${round + 1}`) : ''
-    const seats = panel.map(s => ({ ...s, suiteLog: shared }))
-    await judgeSeats(seats, book, where, context, 'Critique', `${tag} — critique essai ${round + 1}`)
-    const rejected = []
-    const leads = []
-    for (const c of pending) {
-      const j = judge(c, book, IN_RUN)
-      for (const l of j.leads) leads.push(`[${c.id}] ${l}`)
-      const base = { rounds: round + 1, effortReached: effort, leads: j.leads, ...(triage[c.id] ? { triage: triage[c.id] } : {}) }
-      if (j.status === 'defect') {
-        rejected.push(c)
-        history[c.id].push({ round: `essai ${round + 1}`, proofs: j.proofs.join(' / ') })
-        results[c.id] = { ...base, status: 'failed', reason: j.proofs.join('\n') }
-      } else {
-        results[c.id] = { ...base, status: j.status, reason: j.reason || '', proof: j.proof || '' }
+      const panel = round === 0 ? IN_RUN.map(k => ({ ...defs[k], criteria: pending })) : recheckSeats(pending, book, () => IN_RUN, defs)
+      const seats = panel.map(s => ({ ...s, suiteLog: '', slot: groupSlot(g.id, 3 + 3 * round + IN_RUN.indexOf(s.key)) }))
+      await judgeSeats(seats, book, where, context, 'Critique', `${tag} — critique essai ${round + 1}`)
+      const rejected = []
+      const leads = []
+      for (const c of pending) {
+        const j = judge(c, book, IN_RUN)
+        for (const l of j.leads) leads.push(`[${c.id}] ${l}`)
+        const base = { rounds: round + 1, effortReached: effort, leads: j.leads, ...(triage[c.id] ? { triage: triage[c.id] } : {}) }
+        if (j.status === 'defect') {
+          rejected.push(c)
+          history[c.id].push({ round: `essai ${round + 1}`, proofs: j.proofs.join(' / ') })
+          results[c.id] = { ...base, status: 'failed', reason: j.proofs.join('\n') }
+        } else {
+          results[c.id] = { ...base, status: j.status, reason: j.reason || '', proof: j.proof || '' }
+        }
       }
+      log(`${tag} : essai ${round + 1} (opus ${effort}) — ${pending.length - rejected.length}/${pending.length} critère(s) passé(s)${round ? ` · rejugé par : ${seats.map(s => s.label).join(', ')}` : ''}`)
+      if (blocker) {
+        // The developer said the spec must change, or the environment stops him: another round cannot fix that.
+        for (const c of rejected) results[c.id] = { ...results[c.id], status: 'blocked', kind: kindOf(blocker), reason: blocker }
+        pending = []
+        break
+      }
+      feedback = rejected.length ? feedbackFor(rejected, history, leads) : ''
+      pending = rejected
     }
-    log(`${tag} : essai ${round + 1} (opus ${effort}) — ${pending.length - rejected.length}/${pending.length} critère(s) passé(s)${round ? ` · rejugé par : ${seats.map(s => s.label).join(', ')}` : ''}`)
-    if (blocker) {
-      // The developer said the spec must change, or the environment stops him: another round cannot fix that.
-      for (const c of rejected) results[c.id] = { ...results[c.id], status: 'blocked', kind: kindOf(blocker), reason: blocker }
-      pending = []
-      break
-    }
-    feedback = rejected.length ? feedbackFor(rejected, history, leads) : ''
-    pending = rejected
+  } catch (e) {
+    const why = errText(e)
+    log(`${tag} : arrêt sur une erreur (${why}) — critères validés et copie conservés`)
+    for (const c of pending) results[c.id] = { ...(results[c.id] || {}), status: 'crashed', rounds: round + 1, reason: `arrêt sur une erreur : ${why} (panne)` }
   }
   const r = { group: g.id, criteria: ids, where, branch, results, blocker, kind: blocker ? kindOf(blocker) : '', integrated: false, removed: false }
   if (r.where && hasPassing(r)) {
@@ -771,41 +872,41 @@ async function fuse(r) {
     keepBlocked(r, `Non intégré — ${stopped} ; travail conservé sur la branche ${r.branch}.`)
     return
   }
-  const create = !integ.where
-  const already = integratedGroups.map(x => `group ${x.group} (criteria ${x.criteria.join(', ')})`).join(', ')
+  if (!integ.where) {
+    keepBlocked(r, `Non intégré — pas de copie d'intégration ; travail conservé sur la branche ${r.branch}.`)
+    return
+  }
+  // The prompt depends only on this group and on the integration copy, never on which groups were
+  // merged before: a resumed run asks the same, and a fusion already done is recognised, not redone.
   const res = await ask(`You are the integrator. Developers work in parallel, each in its own git worktree of the project at ${ROOT}. Each group the critics validated is merged, as soon as it is done, into one integration branch; later groups and rework start from it. Merge group ${r.group} now.
 
 Spec: ${SPEC}
 Group ${r.group}: worktree ${r.where}, branch ${r.branch}, statuses ${r.criteria.map(id => `${id}=${r.results[id].status}`).join(', ')}
 ${list(r.criteria.map(id => byId[id]))}
-${already ? `Already merged, must keep working: ${already}.` : 'No group merged yet.'}
+The integration copy is ${integ.where} (branch ${integ.branch}). Return its path as workspace and its branch as branch. The groups merged before this one are on that branch (\`git -C ${integ.where} log --oneline --merges\`): they must keep working.
 
-1. ${create
-    ? `No integration copy exists yet: create it — \`${copyCommand('integration', BASE)}\` — then prepare it. ${PREPARE}`
-    : `The integration copy is ${integ.where} (branch ${integ.branch}).`} Return its path as workspace and its branch as branch.
+0. Already merged? \`git -C ${integ.where} log --format=%s | grep -F "${r.branch}"\` prints a line → this group is already on the integration branch (a resumed run): integrated true, do step 5 if its copy or branch still exist, nothing else. Its worktree ${r.where} is gone but its branch exists → do steps 1, 3, 4 and 5 without step 2.
+1. The integration copy lacks the project's dependencies (fresh, never prepared) → prepare it first. ${PREPARE}
 2. Make the group's branch hold exactly what its critics judged, in ${r.where}:
    - stage everything: \`git -C ${r.where} add -A\`
    - check the list \`git -C ${r.where} diff --cached --name-only ${BASE}\` and drop ${DROP} — with \`git -C ${r.where} restore --staged --source=${BASE} -- <path>\` (drops it even if the developer committed it). Everything else staged is the group's work: keep it.
    - something staged → \`git -C ${r.where} commit -m "spec-first : groupe ${r.group}"\`
-3. Merge it: \`git -C <integration copy> merge --no-ff --no-edit ${r.branch}\`. Conflict → resolve the markers so this group's criteria and the merged groups' all still hold (read both sides, keep both intents), then \`git add\` and \`git commit --no-edit\`. Never run \`reset\`, \`rebase\`, \`stash\`, \`checkout\` or \`cherry-pick\` in the integration copy: they can wipe groups already merged.
-4. A dependency came in → install it in the integration copy the usual way. ${FINAL
-    ? `Run targeted tests only${quickTestCommand ? ` (\`${quickTestCommand}\`)` : ''} — those covering this group's criteria and the files the merge touched — from ${SUBDIR ? `the copy's ${SUBDIR} folder` : 'the integration copy'}; the full suite runs once, in the final check.`
-    : `Run the project tests${testCommand ? ` (\`${testCommand}\`)` : ''} from ${SUBDIR ? `the copy's ${SUBDIR} folder` : 'the integration copy'}.`} Fix what the merge broke — only that — and commit the fix. Commit hooks always run, never --no-verify; one fails for a reason outside the merge → integrated false, the cause in reason.
+3. Merge it: \`git -C ${integ.where} merge --no-ff --no-edit ${r.branch}\`. Conflict → resolve the markers so this group's criteria and the merged groups' all still hold (read both sides, keep both intents), then \`git add\` and \`git commit --no-edit\`. Never run \`reset\`, \`rebase\`, \`stash\`, \`checkout\` or \`cherry-pick\` in the integration copy: they can wipe groups already merged. Cannot finish the merge → \`git -C ${integ.where} merge --abort\`, so the integration copy stays as it was.
+4. A dependency came in → install it in the integration copy the usual way. Run targeted tests only${quickTestCommand ? ` (\`${quickTestCommand}\`)` : ''} — those covering this group's criteria and the files the merge touched — from ${SUBDIR ? `the copy's ${SUBDIR} folder` : 'the integration copy'}; the full suite runs only ${FULL_SUITE_WHEN}. Fix what the merge broke — only that — and commit the fix. Commit hooks always run, never --no-verify; one fails for a reason outside the merge → the cause in reason (integrated stays true only if the merge commit is on the integration branch).
 5. Merged and committed → remove the group's copy, no longer needed: \`git -C ${ROOT} worktree remove --force ${r.where}\` (refused, e.g. submodules → \`rm -rf ${r.where} && git -C ${ROOT} worktree prune\`), \`git -C ${ROOT} branch -D ${r.branch}\`, then \`rmdir "$(dirname ${r.where})"\`; removed true. Not merged → leave it in place. Leave every other copy and branch alone. Never edit ${ROOT}'s own files or switch its branch. Cannot merge → integrated false and the reason.
-${portRule(takeSlot())}
+${portRule(groupSlot(r.group, 12))}${holdLine(locksFor(r.criteria))}
 
-${COMMON_RULES}`, { ...FUSION, schema: FUSION_SCHEMA, phase: 'Fusion', label: `Fusion groupe ${r.group} (opus ${FUSION.effort})` })
-  if (res && create) {
-    const ws = clean(res.workspace)
-    if (isCopy(ws) && res.branch) { integ.where = ws; integ.branch = String(res.branch) }
-  }
+${COMMON_RULES}`, { ...FUSION, schema: FUSION_SCHEMA, phase: 'Fusion', label: `Fusion groupe ${r.group} (opus ${FUSION.effort})`, locks: locksFor(r.criteria) })
   if (res) fusions.push({ group: r.group, integrated: !!res.integrated, reason: res.reason, conflicts: res.conflicts, tests: res.tests })
-  if (res && res.integrated && integ.where) {
+  if (res && res.integrated) {
     r.integrated = true
     r.removed = !!res.removed
     integratedGroups.push(r)
     log(`Fusion : groupe ${r.group} intégré (${integratedGroups.length} au total)${(res.conflicts || []).length ? `, ${res.conflicts.length} conflit(s) résolu(s)` : ''}${r.removed ? ', copie supprimée' : ''}`)
-    if (PUBLISH && r.criteria.some(isPub)) await ciKick()
+    if (PUBLISH && r.criteria.some(isPub)) {
+      // The group is merged whatever happens to the CI push.
+      try { await ciKick() } catch (e) { log(`CI : envoi impossible (${errText(e)})`) }
+    }
   } else {
     keepBlocked(r, `Non intégré — travail conservé sur la branche ${r.branch}.${res ? (res.reason ? ` ${res.reason}` : '') : " L'intégrateur n'a pas répondu, deux fois."}`)
     log(`Fusion : groupe ${r.group} non intégré, copie conservée`)
@@ -895,7 +996,8 @@ async function worker() {
     }
   }
 }
-if (GROUPS.length) await parallel(Array.from({ length: Math.min(MAX_GROUPS, GROUPS.length) }, () => () => worker()))
+if (integFailed) GROUPS.forEach((g, i) => { groupResults[i] = stoppedGroup(g, 'blocked', integFailed) })
+else if (GROUPS.length) await parallel(Array.from({ length: Math.min(MAX_GROUPS, GROUPS.length) }, () => () => worker()))
 GROUPS.forEach((g, i) => { if (!groupResults[i]) groupResults[i] = stoppedGroup(g, 'crashed', "le groupe s'est arrêté sur une erreur (panne)") })
 await fuseTail
 
@@ -925,20 +1027,52 @@ ${COMMON_RULES}`, { ...HELPER, schema: TIDY_SCHEMA, phase: 'Fusion', label: `Ran
 
 const status = {}
 for (const r of groupResults) Object.assign(status, r.results)
-for (const c of RECHECK) status[c.id] = { status: 'validated', earlierRun: true, reason: '', proof: 'validé par un run précédent de cette spec' }
+// An earlier run's criterion counts as validated only once this final check judged it again.
+for (const c of RECHECK) status[c.id] = { status: 'unverified', earlierRun: true, reason: 'validé par un run précédent, pas encore rejugé au contrôle final', proof: '' }
 
 // Where the result lives: the integration copy (something merged, or an interrupted run's branch) or the project.
-const TARGET = integ.where && (integratedGroups.length || IB) ? integ.where : ROOT
+let TARGET = integ.where && (integratedGroups.length || IB) ? integ.where : ROOT
+
+// The repair and the publisher never touch the owner's branch: when the result is still the project
+// itself, they work in the integration copy — the one this run made, else a new one from baseCommit.
+async function ensureCopy(what, phaseTitle) {
+  if (TARGET !== ROOT) return true
+  if (!integ.where) {
+    let res = null
+    try {
+      res = await ask(`You make the integration copy of this run, for ${what === 'repair' ? 'the repair of the final check' : 'the publication'}: the owner's own branch is never committed on. Run:
+\`${copyCommand('integration', BASE)}\`
+then prepare it: ${PREPARE}
+Commit nothing. Return its path as workspace and its branch (\`git -C <path> branch --show-current\`) as branch; cannot → workspace empty and the reason in a few French words.
+
+${COMMON_RULES}`, { ...HELPER, schema: COPY_SCHEMA, phase: phaseTitle, label: `Copie d'intégration (opus ${HELPER.effort})` })
+    } catch (e) {
+      res = null
+    }
+    const ws = clean(res && res.workspace)
+    if (!isCopy(ws) || !res.branch) {
+      log(`Copie d'intégration impossible : ${(res && res.reason) || 'pas de réponse'}`)
+      return false
+    }
+    integ.where = ws
+    integ.branch = String(res.branch)
+  }
+  integ.used = true
+  TARGET = integ.where
+  return true
+}
 
 // ================================================================= 3. final check
 // Every passing criterion, this run's and the earlier run's, judged again on the whole result by a
 // wider panel: one tester per three criteria, owner, maintainer, integrator, security — and the
 // remote CI when it was started. What broke goes to one developer (effort escalation, triage); only
 // the critics that did not pass it re-judge, plus the tester of every criterion sharing its files.
+// An error thrown by an agent stops the check, never the report: what was judged stays judged.
 let finalCheck = null
 const finalIds = ALL.filter(c => PASSING.includes((status[c.id] || {}).status)).map(c => c.id)
 if (FINAL && finalIds.length && overBudget('le contrôle final')) {
   finalCheck = { skipped: stopped }
+  for (const c of RECHECK) status[c.id] = { ...status[c.id], reason: `pas rejugé : contrôle final sauté (${stopped})` }
 } else if (FINAL && finalIds.length) {
   phase('Contrôle final')
   const finalCriteria = finalIds.map(id => byId[id])
@@ -954,6 +1088,9 @@ if (FINAL && finalIds.length && overBudget('le contrôle final')) {
   const combined = integratedGroups.length > 1 || RECHECK.length > 0 || !!IB
   const others = ['owner', 'maintainer', ...(combined ? ['integrator'] : []), 'security']
   for (const k of others) defs[k] = seatDef(k, { final: true })
+  // Each critic keeps its ports from the first panel to the last re-check.
+  const FINAL_KEYS = [...shares.map((cs, i) => `tester-${i + 1}`), ...others]
+  for (const k of FINAL_KEYS) defs[k].slot = FINAL_SLOT + FINAL_KEYS.indexOf(k)
   const book = Object.fromEntries(finalIds.map(id => [id, {}]))
   const keysOf = c => [testerOf[c.id], ...others, ...(book[c.id].ci ? ['ci'] : [])]
   const parts = [
@@ -961,35 +1098,47 @@ if (FINAL && finalIds.length && overBudget('le contrôle final')) {
     IB ? `on top of the integration branch ${IB} of an interrupted run` : '',
     RECHECK.length ? `with criteria ${RECHECK.map(c => c.id).join(', ')} that an earlier run of this spec validated` : '',
   ].filter(Boolean).join(', ') || 'the project as it stands'
-  const ctx = `This is the final check of the spec, on the whole result: ${parts}. Look for what the parts broke in each other.
+  // TARGET moves to the integration copy when a repair needs one: the context follows it.
+  const ctx = () => `This is the final check of the spec, on the whole result: ${parts}. Look for what the parts broke in each other.
 ${changesHint(TARGET)}`
-  const firstLog = suitePath('final-1')
   const seats = [
-    ...shares.map((cs, i) => ({ ...defs[`tester-${i + 1}`], criteria: cs, fullSuite: i === 0, suiteLog: firstLog })),
-    ...others.map(k => ({ ...defs[k], criteria: finalCriteria, suiteLog: firstLog })),
+    ...shares.map((cs, i) => ({ ...defs[`tester-${i + 1}`], criteria: cs, fullSuite: i === 0 })),
+    ...others.map(k => ({ ...defs[k], criteria: finalCriteria })),
   ]
-  await parallel([
-    () => judgeSeats(seats, book, TARGET, ctx, 'Contrôle final', 'Contrôle final'),
-    () => (ci.started ? ciWait('contrôle final', book) : Promise.resolve(null)),
-  ])
-  const verdicts = Object.fromEntries(finalCriteria.map(c => [c.id, judge(c, book, keysOf(c))]))
-  let broken = finalCriteria.filter(c => verdicts[c.id].status === 'defect')
-  finalCheck = { checked: finalIds, critics: seats.length, regressions: broken.map(c => c.id), repaired: [], repairRounds: 0 }
-  log(`Contrôle final : ${seats.length} critiques (opus ${FINAL_CRITIC.effort})${ci.started ? ' et la CI' : ''} — ${finalIds.length - broken.length}/${finalIds.length} critère(s) tiennent`)
-  const history = Object.fromEntries(finalIds.map(id => [id, []]))
-  for (const c of broken) history[c.id].push({ round: 'contrôle final', proofs: verdicts[c.id].proofs.join(' / ') })
+  let verdicts = null
+  let broken = []
   const blockedBy = {}
   const crashed = new Set()
   const effortAt = {} // effort reached by the repair, per criterion
-  let nudge = ''
-  for (let round = 0; round < DEV_EFFORTS.length && broken.length; round++) {
-    if (overBudget(`la réparation ${round + 1}`)) break
-    const effort = DEV_EFFORTS[round]
-    const holding = finalCriteria.filter(c => !broken.includes(c))
-    const leads = broken.flatMap(c => verdicts[c.id].leads.map(l => `[${c.id}] ${l}`))
-    const inIntegration = TARGET !== ROOT
-    for (const c of broken) effortAt[c.id] = effort
-    const dev = await ask(`You are the developer repairing the final check of a spec, round ${round + 1} of at most ${DEV_EFFORTS.length}. The final check judged every criterion on the whole result; the ones below broke. Repair them without breaking the others.
+  let interrupted = ''
+  try {
+    const firstLog = suitePath('final-1')
+    for (const s of seats) s.suiteLog = firstLog
+    await parallel([
+      () => judgeSeats(seats, book, TARGET, ctx(), 'Contrôle final', 'Contrôle final'),
+      () => (ci.started ? ciWait('contrôle final', book) : Promise.resolve(null)),
+    ])
+    verdicts = Object.fromEntries(finalCriteria.map(c => [c.id, judge(c, book, keysOf(c))]))
+    broken = finalCriteria.filter(c => verdicts[c.id].status === 'defect')
+    finalCheck = { checked: finalIds, critics: seats.length, regressions: broken.map(c => c.id), repaired: [], repairRounds: 0 }
+    log(`Contrôle final : ${seats.length} critiques (opus ${FINAL_CRITIC.effort})${ci.started ? ' et la CI' : ''} — ${finalIds.length - broken.length}/${finalIds.length} critère(s) tiennent`)
+    const history = Object.fromEntries(finalIds.map(id => [id, []]))
+    for (const c of broken) history[c.id].push({ round: 'contrôle final', proofs: verdicts[c.id].proofs.join(' / ') })
+    let nudge = ''
+    for (let round = 0; round < DEV_EFFORTS.length && broken.length; round++) {
+      if (overBudget(`la réparation ${round + 1}`)) break
+      // Never on the owner's branch: the repair works in the integration copy.
+      const hadCopy = TARGET !== ROOT
+      if (!(await ensureCopy('repair', 'Contrôle final'))) {
+        for (const c of broken) blockedBy[c.id] = `${TECH} copie d'intégration impossible, la réparation n'a pas pu se faire`
+        break
+      }
+      const effort = DEV_EFFORTS[round]
+      const holding = finalCriteria.filter(c => !broken.includes(c))
+      const leads = broken.flatMap(c => verdicts[c.id].leads.map(l => `[${c.id}] ${l}`))
+      const brokenIds = broken.map(c => c.id)
+      for (const c of broken) effortAt[c.id] = effort
+      const dev = await ask(`You are the developer repairing the final check of a spec, round ${round + 1} of at most ${DEV_EFFORTS.length}. The final check judged every criterion on the whole result; the ones below broke. Repair them without breaking the others.
 
 Spec: ${SPEC}
 ${holding.length ? `Must keep holding:\n${list(holding, 'holding_criteria')}\n` : ''}Broken:
@@ -997,82 +1146,93 @@ ${list(broken, 'broken_criteria')}
 ${nudge}${feedbackFor(broken, history, leads)}
 ${changesHint(TARGET)}
 
-${inIntegration
-    ? `Work in the integration copy ${TARGET} (branch ${integ.branch}): every file you edit is under it, never under ${ROOT}. When done, commit your changes on that branch. ${HOOK_RULE}`
-    : `Work in the project at ${ROOT}. Do not commit: the run's result is committed once, at the end of the spec.`}
-Fix only what broke. Re-run the reproductions and the targeted tests${quickTestCommand ? ` (\`${quickTestCommand}\`)` : ''} before returning; the full suite runs again in the re-check.
-${portRule(takeSlot())}
+Work in the integration copy ${TARGET} (branch ${integ.branch}): every file you edit is under it, never under ${ROOT}. ${hadCopy ? '' : `If it lacks the project's dependencies (never prepared), prepare it first: ${PREPARE} `}When done, commit your changes on that branch. ${HOOK_RULE}
+Fix only what broke. Re-run the reproductions and the targeted tests${quickTestCommand ? ` (\`${quickTestCommand}\`)` : ''}${SUBDIR ? ` from the copy's ${SUBDIR} folder` : ''} before returning; the full suite runs again in the re-check.
+${portRule(FINAL_SLOT + 90 + round)}${holdLine(locksFor(brokenIds))}
 Never run commands that rewrite files outside the broken criteria (repo-wide formatters, lockfile upgrades).
 "blocker" stays empty unless you cannot make any progress without the owner changing or clarifying the spec — or, starting with "${TECH}", a technical cause outside your changes stops you.
 
-${COMMON_RULES}`, { model: 'opus', effort, schema: devSchema(broken.map(c => c.id)), phase: 'Contrôle final', label: `Réparation essai ${round + 1} (opus ${effort})` })
-    finalCheck.repairRounds = round + 1
-    if (!dev) {
-      for (const c of broken) crashed.add(c.id)
-      break
+${COMMON_RULES}`, { model: 'opus', effort, schema: devSchema(brokenIds), phase: 'Contrôle final', label: `Réparation essai ${round + 1} (opus ${effort})`, locks: locksFor(brokenIds) })
+      finalCheck.repairRounds = round + 1
+      if (!dev) {
+        for (const c of broken) crashed.add(c.id)
+        break
+      }
+      for (const d of dev.decisions || []) decisions.push(d)
+      if (dev.blocker && !dev.changed) {
+        for (const c of broken) blockedBy[c.id] = dev.blocker
+        break
+      }
+      if (!dev.changed && !dev.blocker) {
+        nudge = IDLE_NOTE
+        log(`Réparation essai ${round + 1} (opus ${effort}) — rien changé, nouvel essai un cran plus haut`)
+        continue
+      }
+      nudge = ''
+      for (const c of broken) addFiles(c.id, dev.files)
+      const reSeats = recheckSeats(broken, book, keysOf, defs).filter(s => s.key)
+      // Criteria that held but share files with the repair: their tester checks them again.
+      const touched = (dev.files || []).map(String)
+      const sharing = holding.filter(c => (filesOf[c.id] || []).some(f => touched.includes(f)))
+      for (const c of sharing) {
+        const k = testerOf[c.id]
+        let s = reSeats.find(x => x.key === k)
+        if (!s) { s = { ...defs[k], criteria: [], previous: [] }; reSeats.push(s) }
+        s.criteria.push(c)
+        s.previous.push([c.id, book[c.id][k]])
+      }
+      // One critic runs the full suite: a repair can break what held.
+      const suiteLog = suitePath(`final-${round + 2}`)
+      const suite = reSeats.find(s => s.persona === 'tester') || reSeats[0]
+      reSeats.forEach(s => { s.suiteLog = suiteLog; s.fullSuite = s === suite })
+      const ciAgain = ci.started && broken.some(c => book[c.id].ci && book[c.id].ci.verdict === 'defect')
+      await parallel([
+        () => judgeSeats(reSeats, book, TARGET, `${ctx()}
+A repair was just made: ${dev.summary}. A test that passed before the repair and fails now is a defect of the criterion being repaired.`, 'Contrôle final', `Contrôle final — après réparation ${round + 1}`),
+        () => (ciAgain ? ciWait(`réparation ${round + 1}`, book) : Promise.resolve(null)),
+      ])
+      const still = []
+      for (const c of [...broken, ...sharing]) {
+        const j = judge(c, book, keysOf(c))
+        verdicts[c.id] = j
+        if (j.status === 'defect') {
+          still.push(c)
+          history[c.id].push({ round: `réparation ${round + 1}`, proofs: j.proofs.join(' / ') })
+        }
+      }
+      finalCheck.repaired.push(...broken.filter(c => !still.includes(c)).map(c => c.id))
+      const newly = sharing.filter(c => still.includes(c)).map(c => c.id)
+      finalCheck.regressions.push(...newly)
+      log(`Réparation essai ${round + 1} (opus ${effort}) — ${broken.length - broken.filter(c => still.includes(c)).length}/${broken.length} réparé(s)${sharing.length ? `, ${sharing.length} critère(s) voisin(s) retesté(s)${newly.length ? ` dont ${newly.length} cassé(s)` : ''}` : ''} · rejugé par : ${[...reSeats.map(s => s.label), ...(ciAgain ? ['la CI'] : [])].join(', ') || 'personne'}`)
+      if (dev.blocker) {
+        for (const c of still) blockedBy[c.id] = dev.blocker
+        break
+      }
+      broken = still
     }
-    for (const d of dev.decisions || []) decisions.push(d)
-    if (dev.blocker && !dev.changed) {
-      for (const c of broken) blockedBy[c.id] = dev.blocker
-      break
-    }
-    if (!dev.changed && !dev.blocker) {
-      nudge = IDLE_NOTE
-      log(`Réparation essai ${round + 1} (opus ${effort}) — rien changé, nouvel essai un cran plus haut`)
+  } catch (e) {
+    interrupted = errText(e)
+    log(`Contrôle final interrompu : ${interrupted}`)
+    for (const c of broken) crashed.add(c.id)
+  }
+  if (!finalCheck) finalCheck = { checked: finalIds, critics: seats.length, regressions: [], repaired: [], repairRounds: 0 }
+  if (interrupted) finalCheck.interrupted = interrupted
+  for (const c of finalCriteria) {
+    const j = verdicts && verdicts[c.id]
+    const { kind, ...prev } = status[c.id] || {}
+    if (!j) {
+      // The first panel never returned: an earlier run's criterion stays unverified, this run's keeps
+      // what its own critics said.
+      if (prev.earlierRun) status[c.id] = { ...prev, status: 'unverified', reason: `pas rejugé : contrôle final interrompu (${interrupted})` }
       continue
     }
-    nudge = ''
-    for (const c of broken) addFiles(c.id, dev.files)
-    const reSeats = recheckSeats(broken, book, keysOf, defs).filter(s => s.key)
-    // Criteria that held but share files with the repair: their tester checks them again.
-    const touched = (dev.files || []).map(String)
-    const sharing = holding.filter(c => (filesOf[c.id] || []).some(f => touched.includes(f)))
-    for (const c of sharing) {
-      const k = testerOf[c.id]
-      let s = reSeats.find(x => x.key === k)
-      if (!s) { s = { ...defs[k], criteria: [], previous: [] }; reSeats.push(s) }
-      s.criteria.push(c)
-      s.previous.push([c.id, book[c.id][k]])
-    }
-    // One critic runs the full suite: a repair can break what held.
-    const suiteLog = suitePath(`final-${round + 2}`)
-    const suite = reSeats.find(s => s.persona === 'tester') || reSeats[0]
-    reSeats.forEach(s => { s.suiteLog = suiteLog; s.fullSuite = s === suite })
-    const ciAgain = ci.started && broken.some(c => book[c.id].ci && book[c.id].ci.verdict === 'defect')
-    await parallel([
-      () => judgeSeats(reSeats, book, TARGET, `${ctx}
-A repair was just made: ${dev.summary}. A test that passed before the repair and fails now is a defect of the criterion being repaired.`, 'Contrôle final', `Contrôle final — après réparation ${round + 1}`),
-      () => (ciAgain ? ciWait(`réparation ${round + 1}`, book) : Promise.resolve(null)),
-    ])
-    const still = []
-    for (const c of [...broken, ...sharing]) {
-      const j = judge(c, book, keysOf(c))
-      verdicts[c.id] = j
-      if (j.status === 'defect') {
-        still.push(c)
-        history[c.id].push({ round: `réparation ${round + 1}`, proofs: j.proofs.join(' / ') })
-      }
-    }
-    finalCheck.repaired.push(...broken.filter(c => !still.includes(c)).map(c => c.id))
-    const newly = sharing.filter(c => still.includes(c)).map(c => c.id)
-    finalCheck.regressions.push(...newly)
-    log(`Réparation essai ${round + 1} (opus ${effort}) — ${broken.length - broken.filter(c => still.includes(c)).length}/${broken.length} réparé(s)${sharing.length ? `, ${sharing.length} critère(s) voisin(s) retesté(s)${newly.length ? ` dont ${newly.length} cassé(s)` : ''}` : ''} · rejugé par : ${[...reSeats.map(s => s.label), ...(ciAgain ? ['la CI'] : [])].join(', ') || 'personne'}`)
-    if (dev.blocker) {
-      for (const c of still) blockedBy[c.id] = dev.blocker
-      break
-    }
-    broken = still
-  }
-  for (const c of finalCriteria) {
-    const j = verdicts[c.id]
-    const { kind, ...prev } = status[c.id] || {}
     const st = crashed.has(c.id) ? 'crashed' : blockedBy[c.id] ? 'blocked' : j.status === 'defect' ? 'failed' : j.status
     const reached = [prev.effortReached, effortAt[c.id]].filter(Boolean).sort((a, b) => DEV_EFFORTS.indexOf(b) - DEV_EFFORTS.indexOf(a))[0]
     status[c.id] = {
       ...prev,
       status: st,
       ...(st === 'blocked' ? { kind: kindOf(blockedBy[c.id]) } : {}),
-      reason: crashed.has(c.id) ? "le développeur de la réparation n'a pas répondu, deux fois (panne)"
+      reason: crashed.has(c.id) ? (interrupted ? `contrôle final arrêté sur une erreur : ${interrupted} (panne)` : "le développeur de la réparation n'a pas répondu, deux fois (panne)")
         : blockedBy[c.id] || (j.status === 'defect' ? j.proofs.join('\n') : (j.reason || '')),
       proof: j.proof || '',
       leads: j.leads,
@@ -1084,22 +1244,30 @@ A repair was just made: ${dev.summary}. A test that passed before the repair and
 // ================================================================= 4. publication
 // Only what the owner authorized with his go, only once every other criterion is validated.
 // The publication criteria were judged on everything but « it is published »: they are validated
-// only when a tester checked them from outside, after the actions were applied.
+// only when a tester checked them from outside, after the actions were applied. A publication
+// criterion held only by other criteria is blocked with kind « attente »: the next run takes it
+// again, in recheck with the same publish, once those criteria are relaunched.
 let publication = null
 if (PUBLISH) {
   const pubCriteria = PUBLISH.ids.map(id => byId[id])
-  const hold = (reason, kind) => {
+  const hold = (reason, kind, waitingFor = []) => {
     for (const c of pubCriteria) {
-      if ((status[c.id] || {}).status === 'validated') status[c.id] = { ...status[c.id], status: 'blocked', kind, reason }
+      if ((status[c.id] || {}).status === 'validated') status[c.id] = { ...status[c.id], status: 'blocked', kind, reason, ...(waitingFor.length ? { waitingFor } : {}) }
     }
-    publication = { done: false, rounds: 0, steps: [], reason }
+    publication = { done: false, rounds: 0, steps: [], reason, ...(waitingFor.length ? { waitingFor } : {}) }
     log(`Publication non lancée : ${reason}`)
   }
-  const waiting = ALL.filter(c => (status[c.id] || {}).status !== 'validated').map(c => c.id)
+  const notValidated = cs => cs.filter(c => (status[c.id] || {}).status !== 'validated').map(c => c.id)
+  // What it waits for: the other criteria first; when they are all validated, the publication
+  // criteria that are not.
+  const othersLeft = notValidated(ALL.filter(c => !isPub(c.id)))
+  const waitFor = othersLeft.length ? othersLeft : notValidated(pubCriteria)
+  const plural = waitFor.length > 1
   if (stopped) hold(`Arrêté : ${stopped}.`, 'technique')
   else if (ci.block) hold(ciReason(ci.block), 'technique')
-  else if (!finalCheck || finalCheck.skipped) hold('le contrôle final n\'a pas eu lieu.', 'technique')
-  else if (waiting.length) hold(`en attente des critère(s) ${waiting.join(', ')}, pas encore validé(s).`, 'technique')
+  else if (waitFor.length) hold(`en attente ${plural ? 'des critères' : 'du critère'} ${waitFor.join(', ')}, pas encore validé${plural ? 's' : ''} : la publication part quand ${plural ? 'ils le sont' : "il l'est"}.`, 'attente', waitFor)
+  else if (!finalCheck || finalCheck.skipped || finalCheck.interrupted) hold('le contrôle final n\'a pas eu lieu jusqu\'au bout.', 'technique')
+  else if (!(await ensureCopy('publication', 'Publication'))) hold("pas de copie d'intégration où appliquer les actions autorisées.", 'technique')
   else {
     phase('Publication')
     publication = { done: false, rounds: 0, steps: [], reason: '' }
@@ -1107,12 +1275,13 @@ if (PUBLISH) {
     let feedback = ''
     let last = null
     let verdicts = {}
-    for (let round = 0; round < DEV_EFFORTS.length; round++) {
-      if (overBudget(`la publication, essai ${round + 1}`)) { publication.reason = `Arrêté : ${stopped}.`; break }
-      const effort = DEV_EFFORTS[round]
-      verdicts = {}
-      last = await ask(`You are the PUBLISHER of a spec, round ${round + 1} of at most ${DEV_EFFORTS.length}. Every criterion of the spec passed the final check. ${authorized()}
-Apply exactly them, in their order, to the run's result: ${TARGET === ROOT ? `the project at ${ROOT}` : `the integration copy ${TARGET} (branch ${integ.branch})`}.${ci.started ? ` Its branch was already pushed as ${ci.ref}${ci.mr ? `, with the draft merge request ${ci.mr}` : ''}: reuse them (mark the request ready before merging it, if the actions merge it).` : ''}
+    try {
+      for (let round = 0; round < DEV_EFFORTS.length; round++) {
+        if (overBudget(`la publication, essai ${round + 1}`)) { publication.reason = `Arrêté : ${stopped}.`; break }
+        const effort = DEV_EFFORTS[round]
+        verdicts = {}
+        last = await ask(`You are the PUBLISHER of a spec, round ${round + 1} of at most ${DEV_EFFORTS.length}. Every criterion of the spec passed the final check. ${authorized()}
+Apply exactly them, in their order, to the run's result: the integration copy ${TARGET} (branch ${integ.branch}) — never the project at ${ROOT} itself.${ci.started ? ` Its branch was already pushed as ${ci.ref}${ci.mr ? `, with the draft merge request ${ci.mr}` : ''}: reuse them (mark the request ready before merging it, if the actions merge it).` : ''}
 Criteria the publication must make true — a tester checks them from outside once you are done:
 ${list(pubCriteria, 'publication_criteria')}
 ${feedback}
@@ -1122,37 +1291,44 @@ ${feedback}
 - An access is missing (token rights, registry login) → status "blocked", the access in reason.
 - Already done by an earlier round or run (branch pushed, request open, tag present, version published) → keep it, don't redo it.
 This prompt is the exception to the « never push or publish » rule, for the actions above only.
-${portRule(takeSlot())}
+${portRule(PUB_SLOT + round)}
 
 ${COMMON_RULES}`, { model: 'opus', effort, schema: PUB_SCHEMA, phase: 'Publication', label: `Publication essai ${round + 1} (opus ${effort})` })
-      publication.rounds = round + 1
-      if (!last) { publication.reason = "l'agent de publication n'a pas répondu, deux fois (panne)"; break }
-      publication.steps = last.steps || []
-      if (last.status === 'unavailable') {
-        ci.block = { cause: last.cause, job: last.job, runner: last.runner, unblock: last.unblock, pipeline: '' }
-        publication.reason = ciReason(ci.block)
-        break
-      }
-      if (last.status === 'blocked') { publication.reason = last.reason || 'accès manquant'; break }
-      if (last.status !== 'done') {
-        publication.reason = last.reason || 'publication inachevée'
-        feedback = `\nYour previous round did not finish: ${publication.reason}. Find why, fix it within the authorized actions, and finish; keep what is already done.\n`
-        log(`Publication essai ${round + 1} (opus ${effort}) — inachevée : ${publication.reason}`)
-        continue
-      }
-      const seat = seatDef('tester-publication', { label: 'testeur publication', final: true, publication: true, criteria: pubCriteria })
-      await judgeSeats([seat], pbook, TARGET, `<publisher_report>
+        publication.rounds = round + 1
+        if (!last) { publication.reason = "l'agent de publication n'a pas répondu, deux fois (panne)"; break }
+        publication.steps = last.steps || []
+        if (last.status === 'unavailable') {
+          ci.block = { cause: last.cause, job: last.job, runner: last.runner, unblock: last.unblock, pipeline: '' }
+          publication.reason = ciReason(ci.block)
+          break
+        }
+        if (last.status === 'blocked') { publication.reason = last.reason || 'accès manquant'; break }
+        if (last.status !== 'done') {
+          publication.reason = last.reason || 'publication inachevée'
+          feedback = `\nYour previous round did not finish: ${publication.reason}. Find why, fix it within the authorized actions, and finish; keep what is already done.\n`
+          log(`Publication essai ${round + 1} (opus ${effort}) — inachevée : ${publication.reason}`)
+          continue
+        }
+        const seat = seatDef('tester-publication', { label: 'testeur publication', final: true, publication: true, criteria: pubCriteria, slot: PUB_SLOT + 5 })
+        await judgeSeats([seat], pbook, TARGET, `<publisher_report>
 ${publication.steps.map(s => `- ${s.action}: ${s.outcome}`).join('\n') || 'none'}
 </publisher_report>
 These are claims, not evidence: check each criterion yourself, from outside.`, 'Publication', `Publication essai ${round + 1}`)
-      verdicts = Object.fromEntries(pubCriteria.map(c => [c.id, judge(c, pbook, ['tester-publication'])]))
-      const bad = pubCriteria.filter(c => verdicts[c.id].status !== 'validated')
-      log(`Publication essai ${round + 1} (opus ${effort}) — ${pubCriteria.length - bad.length}/${pubCriteria.length} critère(s) vérifié(s) de l'extérieur`)
-      if (!bad.length) { publication.done = true; publication.reason = ''; break }
-      publication.reason = 'le testeur publication a rejeté le résultat'
-      // The tester could not look: doing the actions again would change nothing.
-      if (bad.every(c => verdicts[c.id].status !== 'defect')) break
-      feedback = `\nThe publication tester rejected the previous round:\n${bad.map(c => `[${c.id}] ${(verdicts[c.id].proofs || [verdicts[c.id].reason]).join(' / ')}`).join('\n')}\nFix what is missing within the authorized actions; keep what is already done.\n`
+        verdicts = Object.fromEntries(pubCriteria.map(c => [c.id, judge(c, pbook, ['tester-publication'])]))
+        const bad = pubCriteria.filter(c => verdicts[c.id].status !== 'validated')
+        log(`Publication essai ${round + 1} (opus ${effort}) — ${pubCriteria.length - bad.length}/${pubCriteria.length} critère(s) vérifié(s) de l'extérieur`)
+        if (!bad.length) { publication.done = true; publication.reason = ''; break }
+        publication.reason = 'le testeur publication a rejeté le résultat'
+        // The tester could not look: doing the actions again would change nothing.
+        if (bad.every(c => verdicts[c.id].status !== 'defect')) break
+        feedback = `\nThe publication tester rejected the previous round:\n${bad.map(c => `[${c.id}] ${(verdicts[c.id].proofs || [verdicts[c.id].reason]).join(' / ')}`).join('\n')}\nFix what is missing within the authorized actions; keep what is already done.\n`
+      }
+    } catch (e) {
+      // A breakdown: what was applied is in steps; the criteria are reported « en panne », never lost.
+      publication.reason = `arrêt sur une erreur : ${errText(e)} (panne)`
+      log(`Publication interrompue : ${errText(e)}`)
+      last = null
+      verdicts = {}
     }
     for (const c of pubCriteria) {
       const v = verdicts[c.id]
@@ -1185,12 +1361,14 @@ const counts = { total: criteria.length, validated: 0, unverified: 0, failed: 0,
 for (const c of criteria) counts[c.status] += 1
 log(`Fin : ${counts.validated}/${counts.total} validé(s), ${counts.unverified} non vérifié(s), ${counts.failed} en échec, ${counts.blocked} bloqué(s)${counts.crashed ? `, ${counts.crashed} en panne` : ''}${stopped ? ' — arrêt avant la fin (budget)' : ''}`)
 
-// What this run left on disk: the integration copy (removed by the skill after the squash) and the
-// work of groups never merged (worktree, or only its branch once tidied).
+// What this run left on disk: the integration copy — kept, removed by the skill once its branch is
+// squashed into the project; it never holds work found nowhere else (empty: nothing was merged into
+// it) — and the work of groups never merged (worktree, or only its branch once tidied).
+// Group copies that were merged are already gone.
 const copies = groupResults
   .filter(r => (r.where && !r.removed) || (r.branch && !r.integrated))
   .map(r => ({ group: r.group, worktree: r.removed ? '' : r.where, branch: r.branch, integrated: r.integrated }))
-if (integ.where) copies.push({ group: 'intégration', worktree: integ.where, branch: integ.branch, integrated: integratedGroups.length > 0 || !!IB })
+if (integ.where) copies.push({ group: 'intégration', worktree: integ.where, branch: integ.branch, integrated: true, ...(integratedGroups.length || IB || integ.used ? {} : { empty: true }) })
 
 return {
   specId: SPEC_ID,
