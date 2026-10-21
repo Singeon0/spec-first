@@ -83,6 +83,8 @@ Good: « Le raccourci peut interférer avec la sélection dans un cas rare. A : 
 **Before the spec**: read what answers it — CLAUDE.md, earlier specs, tracker, recent commits, recorded decisions. Ask only what they leave open; flag any spec point contradicting a recorded decision.
 
 **Spec file** before any dev work (project's spec location, e.g. `specs/<task>.md`), only: goal (one sentence) · acceptance criteria (observable, checkable on the real result, checklist `- [ ]`) · out of scope.
+- criteria cut fine: one observable behaviour each; a broad one → sub-criteria (2.1, 2.2) · same scope, finer cut → more of them run at once (§7)
+- what other criteria build on (a shared module, a data format, a common screen) → criteria marked « socle » → run first, on their own (§7)
 No steps, technical choices or how — he approves an outcome, not a method. Clarify first only what changes the spec, batched as lettered options; never a questionnaire (offloads your thinking onto him).
 
 **Clean git — you make it so; he never commits by hand.** Before asking for the go:
@@ -101,7 +103,7 @@ No steps, technical choices or how — he approves an outcome, not a method. Cla
 - no approval checkpoints, mid-run questions or how-narration
 - « terminé » only after the critics (separate agents, never the author) check every criterion on the real result
 - tick a criterion in the spec only when the critics pass it
-- fails → iterate one effort tier up (§7); 3 failed rounds on one criterion → stop, escalate the gap to him
+- fails → the developer sorts the cause (a slip to fix, or an approach to change) and goes one effort tier up (§7); 3 failed rounds → that criterion relaunched once, alone, from the effort it reached; fails again → stop point, once all the rest is done
 - unverified → « non vérifié », never presented as done
 
 **Go → stop point: every message carries a tool call** (except the wait line below). A message without one ends your turn and stops the work; the only such message: the stop itself.
@@ -119,20 +121,22 @@ No steps, technical choices or how — he approves an outcome, not a method. Cla
 - **truly blocked**
 - **spec must change** → the change as an option; act only on his yes
 
+A stop point comes only once every other criterion is done: never park the run on a question while work can go on (an unanswered question at night = hours lost).
 Stop before the end → the lettered question also settles the run's changes: « A je commite l'état actuel, B j'annule les changements du run » (nothing left uncommitted without his decision).
 Long run, before each reply → quick re-check: scope unchanged · verdict first · nothing settled re-opened.
 
-**Right after his go → the goal.** End the launch turn's message with this line, filled in (real file name, real N), alone in a code block (one-gesture copy):
+**Right after his go → the goal.** End the launch turn's message with this line, filled in (real file name), alone in a code block (one-gesture copy):
 
 ```
-/goal Le rapport du run de specs/<fichier>.md donne N/N critères validés par les critiques et le nettoyage est fait, OU une seule question lettrée attend la décision du propriétaire (blocage ou changement de spec).
+/goal Tous les critères de specs/<fichier>.md sont cochés, validés par les critiques dans le rapport du dernier run spec-first, et le nettoyage est fait — OU tout le reste est fini et les seuls critères restants attendent ce que seul le propriétaire peut fournir (un appareil, un accès, un changement de spec).
 ```
 
+- no count in it: it stays true when the spec gains or splits a criterion · covers both runs of a two-run spec (§7): the last run's report holds every criterion
 - one line before: « Colle cette ligne pour que le run aille au bout sans relance : » · nothing after · under 500 characters
 - never set the goal yourself: he pastes it or not
 - `ProposeGoal` available (check via ToolSearch, once) → call it instead, `ask_user: true`, same condition; don't print the line
 - goal keeps the run going: a turn ending before a stop point is sent back to work → never ask him to say « continue »
-- a separate evaluator judges from the conversation alone (can't read files or run commands) → stop-point message quotes the evidence: each criterion's verdict, critics' count (« 4/4 validés »), clean-up report
+- a separate evaluator judges from the conversation alone (can't read files or run commands) → stop-point message quotes the evidence: every criterion of the spec with its verdict from the last report, the clean-up report; a stop before the end → what is left and what only he can provide
 - background workflow → the evaluation waits for it; end the turn as usual (waiting, above)
 - findings outside the spec never enter the goal → second spec (§8)
 - not pasted, or declined → carry on without it, never offer it again; never say why a tool is missing
@@ -160,43 +164,60 @@ Good: « Le skill GitLab échoue avec telle erreur. A : je réessaie via le skil
 
 You orchestrate: you neither write nor judge the code — sub-agents do. Your job: cut the work into everything that can run at once, the right model per piece. Maximum parallelism via the Workflow tool: a workflow fans a phase out; chain several when a phase needs the previous one's result. Writing your own → load the workflow-authoring skill first.
 
-**Models — per job, the cheapest that does it well**
-- **Haiku medium/high**: fast, 20–40× cheaper than Opus per token (4–8× once its prompt exceeds 100k tokens) → wide simple jobs: codebase research, facts to gather, one plain rule checked on many items. Shallow, misses subtle defects → never judges a criterion or writes code that matters; one Opus aggregates its findings.
-- **Opus medium**: default for real work — developing, analysing, aggregating; better and cheaper per task than any Sonnet.
-- **Opus high → xhigh**: sharper reading — critics, fusion, hard problems; one tier up after each failure.
-- Never Opus max (his call alone), never Fable.
+**Models — Opus only, medium at least** (his decision: every agent gets real work, of uneven difficulty)
+- **Opus medium**: default for real work — developing, analysing, research, aggregating.
+- **Opus high**: every critic, in every phase · fusion.
+- **Opus high → xhigh**: a developer after each rejection, one tier up.
+- Never Sonnet, Haiku or Fable · never Opus max (his call alone).
 - Every agent you launch: explicit model + effort (else it takes your session's, max included).
 
 **Judging — same in every workflow, ready-made or yours** (one exception: the one-sentence spec, below)
 
 ```
 developer ──→ 3 critics, blind to each other, judge each criterion ──→ all pass ✓
-Opus medium   Opus, one tier above the developer
+Opus medium   Opus high
    ↑                    │ rejected
-   └── one tier up ─────┘   developer: medium → high → xhigh · critics: high → xhigh
-groups with a passing criterion → fusion (Opus high)
-merged or reworked → final check of every criterion on the integrated result (Opus, one tier above the highest developer effort)
-  └ something broke → one repair (Opus xhigh) → every criterion judged again
+   └─ sort, then one tier up ─┘   developer: medium → high → xhigh
+                          only the critics that did not pass judge again, given their own proof
+group done, a criterion passes → merged at once into the integration branch (Opus high, one at a time)
+                                  └ later rework starts from it
+all groups done → final check of every criterion on the whole result (Opus high, wider panel)
+  └ something broke → one developer repairs (sort + one tier up) → only the critics that rejected judge again
 ```
 
 - **testeur**: runs the real result, tries to break the criterion; visual criteria → checked on screen with the screenshot and browser tools
 - **propriétaire**: checks it does what he meant, not a convenient reading of the words; contradicts none of his decisions
-- **mainteneur**: reads the changes — security, side effects, scope creep, existing tests
+- **mainteneur**: reads the changes — side effects, scope creep, fragile code; security too, except in the final check
+- final check only, on top: one **testeur** per three criteria (one runs the full test suite) · **intégrateur**: what the merged parts broke in each other · **sécurité**: holes the changes introduced (injection, access, secrets)
+- sort after a rejection: a slip → fixed at the root · the approach can't satisfy the criterion, or the same defect came back → another approach, never a second patch
 - criterion passes = tester verified it on the real result + no critic proved a defect; a defect without a reproduction is not one
 
 **`spec-first:run`** — ready-made: developers, critics, escalation, fusion, final check. Call right after his go (and the « travail en cours » commit, if any), absolute paths, criteria numbered as in the spec:
-`Workflow({name: "spec-first:run", args: {specPath, projectRoot, baseCommit, criteria: [{id, text}], groups, testCommand, setupCommand}})`
+`Workflow({name: "spec-first:run", args: {specPath, projectRoot, baseCommit, criteria: [{id, text}], groups, testCommand, setupCommand, finalCheck, recheck, startEffort}})`
 - `projectRoot`: git repository top (§4) · `baseCommit`: `git rev-parse HEAD`, right before the call
-- `groups`: every criterion id once; criteria that may touch the same files share a group → each group: its own developer, all at once, in its own copy made from `baseCommit` inside the project (`.claude/worktrees/`, hidden from git) → its judged work merged, committed or not; copies kept until the end (§8) · cut as fine as the code allows: one group per independent criterion · omitted → one developer takes everything, in the project itself · project clean (§4) → no sequential fallback
+- `groups`: every criterion id of this run once · one group per criterion; two share a group only when one can't be checked without the other · groups may touch the same files: the fusion resolves conflicts · each group: its own developer, all at once, in its own copy made from `baseCommit` inside the project (`.spec-first/copies/`, hidden from git locally) · omitted → one developer takes everything, in the project itself · project clean (§4) → no sequential fallback
 - `testCommand`: runs the project tests from its root; omit if none
 - `setupCommand`: makes a fresh copy runnable (dependencies installed, local config copied from the project), e.g. `uv sync && cp <root>/.env .`; omit if a fresh checkout runs as is
+- `finalCheck: false` / `recheck`: the two-run spec, below · `startEffort`: `{id: effortReached}` from the last report, for a relaunched criterion
+
+**Spec with « socle » criteria → two runs in a row, chained alone (the goal covers both)**
+```
+run 1: socle criteria only, finalCheck: false → result squashed + commit « spec : <nom> (socle) »
+run 2: the other criteria, baseCommit = that commit, recheck = the socle criteria (id, text)
+       → its final check judges every criterion of the spec → one report for both runs
+```
+- run 1 leaves a criterion failed or blocked → handle it as below before run 2; run 2 never starts on a broken socle
+- the last reply merges both runs: decisions, findings outside the spec, copies of both
+
+**Result** (`result` in the report): `in: "project"` → already in the working tree · `in: "integration"` → on `result.branch`: `git -C <root> merge --squash <branch>`, then the « spec » commit (§8)
 - another run in the same spec (a relaunch, a changed spec) → first commit the work so far, spec file aside, in one local commit « spec : <nom> (étape N) »; that commit = its `baseCommit` (copies start from it)
 
-Use as is, or surround with your own workflows when the spec calls for it (e.g. codebase-wide research fanned out to Haikus before the developers start). Workflows run in the background → wait (§4) until each returns. Then:
+Use as is, or surround with your own workflows when the spec calls for it (e.g. codebase-wide research fanned out to Opus medium agents before the developers start). Workflows run in the background → wait (§4) until each returns. Then:
 - « validé » → tick it in the spec, add « Décisions prises pendant le run » → clean up and end (§8)
 - « non vérifié » → never « terminé »: a critic did not return (« no verdict from … ») → judge it again with the Agent tool, same persona, model and effort; something only he can provide is missing (a device, a credential) → stop point « truly blocked » (§4)
 - « bloqué » by a blocker that is only the how (nothing for him to decide) → decide it, log it under « Décisions prises pendant le run », relaunch that criterion alone
-- « en échec » after three rounds, or « bloqué » for anything else (a blocker that needs him, or work not merged — its copy kept: `copies` with `integrated: false`) → stop point (§4): the gap in his terms, options, your recommendation
+- « en échec » after three rounds → commit the work so far (« étape N »), relaunch that criterion alone, `startEffort` = its `effortReached`, once
+- « en échec » again, or « bloqué » for anything else (a blocker that needs him, or work not merged — its copy kept: `copies` with `integrated: false`) → stop point (§4), once the rest is done: the gap in his terms, options, your recommendation
 - found beyond the spec (task wider than planned, neighbouring problem) → never added to this run → second spec (§8)
 
 One-sentence spec (small reversible task, §4) → no workflow: one Opus medium sub-agent does it, one Opus high tester checks it.
@@ -211,7 +232,7 @@ criteria pass → commit « spec : <nom> » → clean-up sub-agent → commit «
 ```
 
 **Commit, then clean up, still inside the run** — two local commits on the current branch, yours, never his:
-1. « spec : <nom> »: the result + the ticked spec; you make it.
+1. « spec : <nom> »: the result (`merge --squash` of `result.branch` when `in: "integration"`, §7) + the ticked spec; you make it.
 2. « nettoyage : <nom> »: one Opus medium sub-agent, given the project root, the spec, the « spec » commit, the `copies` of every run of this spec, the files this conversation created. Job: repository as clean as if done in one go, in a commit that can be undone on its own:
    - remove this spec's `copies` with `integrated: true` — `git worktree remove --force`, `git branch -D`, then the empty folder (their work is in the « spec » commit)
    - delete the temporary files, probes, logs and scratch files this conversation created
