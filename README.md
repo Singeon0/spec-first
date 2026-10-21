@@ -45,8 +45,11 @@ After a rejection the developer first sorts the cause: a slip is fixed at
 the root, an approach that can't satisfy the criterion is replaced, never
 patched twice. A criterion passes only when the tester verified it on the
 real result and no critic proved a defect. Three rejected rounds → the
-criterion is relaunched alone from the effort it reached; failing again,
-it goes back to the owner — but only once everything else is done.
+criterion is relaunched from the effort it reached — every criterion to
+relaunch together, in one run, one group each; failing again, it goes back
+to the owner — but only once everything else is done. A technical block
+(remote CI unavailable, a machine down) is never relaunched as is: the
+owner gets its cause and the one action that lifts it.
 
 The plugin ships a ready-made workflow, `spec-first:run`
 (`workflows/run.js`), that does all of it for a spec: groups run at once,
@@ -61,8 +64,24 @@ runs. The copies stay until the end of the spec. The run starts from a
 clean git repository: the owner never commits by hand — work in progress
 is committed by Claude, with his go, before launching; there is no
 sequential mode. A `setupCommand` makes each copy runnable (dependencies,
-local config), and every agent gets its own ports. The orchestrator may
-wrap the workflow in workflows of its own.
+local config), and every agent gets its own ports. At most three groups
+are active at once (`maxGroups`, four at most); the others start as soon
+as one finishes. A `quickTestCommand` gives developers and critics the
+fast tests; the full suite runs once, in the final check. In a monorepo,
+`subdir` names the project's folder: copies are made at the repository
+top, commands run from that folder. Two runs at once only on distinct
+repositories. The orchestrator may wrap the workflow in workflows of its
+own, and checks a long run once an hour: an agent stuck since the last
+check → the workflow is stopped and resumed from its journal.
+
+Before the go, Claude checks every access the run needs (registry, ssh,
+tokens, remote CI runners) and lists, in one line, every external action
+the run will take: publish a version, push a branch, open and merge a
+merge request, tag. The owner's go authorizes those actions, and only
+those (`publish`). They run after the final check, once every other
+criterion is validated; a fresh tester checks them from outside. When
+they go through a remote CI, its pipeline starts as soon as the first
+group is merged, and its result counts in the final check.
 
 ## The end
 
@@ -70,7 +89,9 @@ A spec ends. Once the criteria pass, the result is committed locally
 (« spec : <nom> »), then an Opus sub-agent cleans the repository in a
 second local commit (« nettoyage : <nom> », tests re-run): this run's
 merged copies (worktrees and branches), temporary files, and whatever
-the merged change made useless. Nothing is pushed. Copies that were never
+the merged change made useless. Nothing is pushed beyond the actions the
+go authorized; when the publication merged the result on the remote, the
+local branch is brought to it instead of squashed. Copies that were never
 merged, any other `spec-first-*` copy or branch, remote branches and
 anything else that cannot be undone wait for the owner's yes. The last
 reply says the spec is done and stops — no next steps. What the work

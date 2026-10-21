@@ -13,6 +13,8 @@ disable-model-invocation: true
 allowed-tools:
   - Workflow
   - ProposeGoal
+  - ScheduleWakeup
+  - TaskStop
 ---
 
 # Spec-first — he owns the what, you own the how
@@ -25,11 +27,11 @@ allowed-tools:
 - Resuming (gap, new session) → first line: what is settled, what is open (settled points erode at session boundaries, not mid-run).
 
 ```
-sources → spec file → clean git → HIS GO → /goal line
-  → RUN: autonomous, you orchestrate (§7)
+sources → spec file → accesses checked → clean git → HIS GO (+ the external actions it allows) → /goal line
+  → RUN: spec-first:run, autonomous, you orchestrate (§7)
   → one of three stop points (§4):
       ├ all criteria pass → « spec » commit → clean-up commit → END (§8)
-      ├ truly blocked     → lettered question
+      ├ truly blocked     → lettered question, or a technical block + the one action that lifts it
       └ spec must change  → option → act on his yes
 ```
 
@@ -86,25 +88,33 @@ Good: « Le raccourci peut interférer avec la sélection dans un cas rare. A : 
 - nothing else in it: no status line, no « en attente de ton go » · a draft's « Brouillon — pas encore de go » header removed at his go (an agent reading it stops)
 - criteria cut fine: one observable behaviour each; a broad one → sub-criteria (2.1, 2.2) · same scope, finer cut → more of them run at once (§7)
 - what other criteria build on (a shared module, a data format, a common screen) → criteria marked « socle » → run first, on their own (§7)
+- something to publish (a release, a merge request merged, a version pinned) → a criterion like any other, checkable from outside (« seglab-hsi 0.13.2 s'installe depuis le registre GitLab »)
 No steps, technical choices or how — he approves an outcome, not a method. Clarify first only what changes the spec, batched as lettered options; never a questionnaire (offloads your thinking onto him).
 
 **Clean git — you make it so; he never commits by hand.** Before asking for the go:
-- git repository top: `git rev-parse --show-toplevel` (project in a sub-folder → runs from that top)
+- git repository top: `git rev-parse --show-toplevel` (project in a sub-folder → `projectRoot` = that top, `subdir` = the sub-folder) · a sub-project with its own `.git` (e.g. `pyplet/apps/QualiSpectra`) = its own `projectRoot`
 - nothing uncommitted but the spec: `git status --porcelain`
 - other changes in progress → one line in the go request; his go = his yes to commit them first, one local commit « travail en cours avant la spec <nom> »
-- not a git repository → same, announced the same way: `git init` + a `.gitignore` for its dependency, build and cache folders + first commit
+- not a git repository → same, announced the same way: `git init` + a `.gitignore` for its dependency, build and cache folders + first commit · never `git init` in a folder that holds git repositories or sits inside one → one run per repository (§7)
 - never stash or discard his changes
 - likely secret (`.env`, key, token) not in `.gitignore`, or binary > 10 MB → never committed unasked: A add it to `.gitignore`, B commit it anyway
 - the launch and the run's edits go unasked only in auto/bypass permission mode → another mode known to be on → one line in the go request: each launch will ask for his approval
 
+**Before the go → check every access the run will need**, yourself, non-interactively (`GIT_TERMINAL_PROMPT=0`, `ssh -o BatchMode=yes`):
+- each access the criteria need: registry, ssh host, connector, token — rights included (push, open and merge a merge request)
+- remote CI the work goes through: a runner takes its jobs' tags · its last pipeline did not fail for a machine reason (disk full, no runner) · the token can open and merge the merge request
+- missing or broken → in the go request, as lettered options (A he fixes it first, B the run goes without that criterion); never found at the end of the run
+
 **Go** = his go on this spec. Not a go: an earlier session's go, an ambiguous « ok » (false go → work he didn't choose). Small reversible task → one-sentence spec inline, zero questions.
+- the go request lists, in one readable line, every external action the run will take — e.g. « publier seglab-hsi 0.13.2 sur le registre GitLab », « pousser la branche feat/x, ouvrir la MR vers main, attendre la CI, la fusionner, taguer » → his go authorizes those, only those (`publish`, §7)
+- nothing listed → nothing leaves the machine
 
 **Run: fully autonomous, you orchestrate (§7)**
 - time matters: the earlier a verified result, the better → independent criteria in parallel
 - no approval checkpoints, mid-run questions or how-narration
 - « terminé » only after the critics (separate agents, never the author) check every criterion on the real result
 - tick a criterion in the spec only when the critics pass it
-- fails → the developer sorts the cause (a slip to fix, or an approach to change) and goes one effort tier up (§7); 3 failed rounds → that criterion relaunched once, alone, from the effort it reached; fails again → stop point, once all the rest is done
+- fails → the developer sorts the cause (a slip to fix, or an approach to change) and goes one effort tier up (§7); 3 failed rounds → relaunched once, from the effort it reached, together with every other criterion to relaunch (one run, one group each, §7); fails again → stop point, once all the rest is done
 - unverified → « non vérifié », never presented as done
 
 **Go → stop point: every message carries a tool call** (except the wait line below). A message without one ends your turn and stops the work; the only such message: the stop itself.
@@ -116,10 +126,13 @@ No steps, technical choices or how — he approves an outcome, not a method. Cla
 - do what doesn't depend on it → end the turn with one line in criteria terms (« Run en cours — critères 1 à 4. »): no question, options or next step
 - its completion notification resumes you; he types nothing
 - never poll (no sleep, no command loop holding the turn); never re-launch running work
+- a long command of your own (> 2 min: e2e, CI, training) → background, output in a file, bounded waits (`timeout`, a loop with a max count) · never `pgrep -f` on a pattern (it finds itself), never `sleep` after `sleep` · remote CI → its API, ≥ 60 s between reads, total limit stated
+- watchdog, the one allowed check: `ScheduleWakeup` ≥ 1 h → read the workflow's journal · an agent stuck since the last check → `TaskStop` the workflow, relaunch it with `resumeFromRunId` and the same args (finished agents come back from cache, the stuck one starts again) → one line in criteria terms
+- never wait hours on an answer from him during a run
 
 **Only three stop points**
 - **all criteria pass** → clean up → end (§8)
-- **truly blocked**
+- **truly blocked** → what only he can provide (a device, an access, a decision) — or a technical block the run could not lift (CI unavailable, a broken machine): its cause, the job or machine, the one action that lifts it; said once, never re-asked
 - **spec must change** → the change as an option; act only on his yes
 
 A stop point comes only once every other criterion is done: never park the run on a question while work can go on (an unanswered question at night = hours lost).
@@ -195,11 +208,15 @@ all groups done → final check of every criterion on the whole result (Opus xhi
 - criterion passes = tester verified it on the real result + no critic proved a defect; a defect without a reproduction is not one
 
 **`spec-first:run`** — ready-made: developers, critics, escalation, fusion, final check. Call right after his go (and the « travail en cours » commit, if any), absolute paths, criteria numbered as in the spec:
-`Workflow({name: "spec-first:run", args: {specPath, projectRoot, baseCommit, criteria: [{id, text}], groups, testCommand, setupCommand, finalCheck, recheck, startEffort}})`
+`Workflow({name: "spec-first:run", args: {specPath, projectRoot, baseCommit, criteria: [{id, text}], groups, testCommand, quickTestCommand, setupCommand, subdir, maxGroups, finalCheck, recheck, startEffort, publish}})`
 - `projectRoot`: git repository top (§4) · `baseCommit`: `git rev-parse HEAD`, right before the call
 - `groups`: every criterion id of this run once · one group per criterion; two share a group only when one can't be checked without the other · groups may touch the same files: the fusion resolves conflicts · each group: its own developer, all at once, in its own copy made from `baseCommit` inside the project (`.spec-first/copies/`, hidden from git locally) · omitted → one developer takes everything, in the project itself · project clean (§4) → no sequential fallback
 - `testCommand`: runs the project tests from its root; omit if none
+- `quickTestCommand`: the fast subset (no e2e, no training) — developers and critics run it; the full `testCommand` runs once, by one tester of the final check · omitted → `testCommand` everywhere
 - `setupCommand`: makes a fresh copy runnable (dependencies installed, local config copied from the project), e.g. `uv sync && cp <root>/.env .`; omit if a fresh checkout runs as is
+- `subdir`: the project's folder inside the repository (monorepo) — copies are made at the repository top, every command runs from this folder
+- `maxGroups`: groups active at once (default 3, max 4) — the rest wait, each starts as soon as one finishes · pass it lower when the machine is small
+- `publish`: `{actions, criteria}` — the external actions his go authorized (§4), in one readable line, and the ids of the criteria they make true · runs after the final check, once every other criterion is validated; checked from outside by a fresh tester · omitted → nothing is pushed, published or merged
 - `finalCheck: false` / `recheck`: the two-run spec, below · `startEffort`: `{id: effortReached}` from the last report, for a relaunched criterion
 
 **Spec with « socle » criteria → two runs in a row, chained alone (the goal covers both)**
@@ -208,18 +225,21 @@ run 1: socle criteria only, finalCheck: false → result squashed + commit « sp
 run 2: the other criteria, baseCommit = that commit, recheck = the socle criteria (id, text)
        → its final check judges every criterion of the spec → one report for both runs
 ```
+- two runs at once only on distinct repositories (a sub-project with its own `.git`, another repo) — never two runs on the same repository
 - run 1 leaves a socle criterion failed or blocked → relaunch it as below; meanwhile run 2 goes on with the criteria that don't build on it · those that do wait with it
 - the last reply merges both runs: decisions, findings outside the spec, copies of both
 
 **Result** (`result` in the report): `in: "project"` → already in the working tree · `in: "integration"` → on `result.branch`: `git -C <root> merge --squash <branch>`, then the « spec » commit (§8)
+- `publication` (`done`, `steps`, `reason`) and `ci` (`branch`, `mergeRequest`, `unavailable`) → what left the machine, said in the last reply
 - another run in the same spec (a relaunch, a changed spec) → first commit the work so far, spec file aside, in one local commit « spec : <nom> (étape N) »; that commit = its `baseCommit` (copies start from it)
 
 Use as is, or surround with your own workflows when the spec calls for it (e.g. codebase-wide research fanned out to Opus medium agents before the developers start). Workflows run in the background → wait (§4) until each returns. Then:
 - « validé » → tick it in the spec, add « Décisions prises pendant le run » → clean up and end (§8)
 - « non vérifié » → never « terminé »: a critic did not return (« aucun verdict de … ») → judge it again with the Agent tool, same persona, model and effort; something only he can provide is missing (a device, a credential) → stop point « truly blocked » (§4)
-- « bloqué » by a blocker that is only the how (nothing for him to decide) → decide it, log it under « Décisions prises pendant le run », relaunch that criterion alone
-- « en échec » after three rounds → commit the work so far (« étape N »), relaunch that criterion alone, `startEffort` = its `effortReached`, once
-- a relaunch alone → `recheck` = every other criterion of the spec already validated: its final check judges them all on the new code, its report holds every criterion (the goal)
+- « bloqué » by a blocker that is only the how (nothing for him to decide) → decide it, log it under « Décisions prises pendant le run », relaunch it with the others to relaunch
+- « en échec » after three rounds → commit the work so far (« étape N »), relaunch it, `startEffort` = its `effortReached`, once
+- every criterion to relaunch → one run, all together, one group each, never one run per criterion · `recheck` = every other criterion of the spec already validated: its final check judges them all on the new code, its report holds every criterion (the goal)
+- « bloqué » with `kind: "technique"` (CI unavailable, a machine down, a copy impossible) → never relaunched as is: stop point with its cause and the one action that lifts it (§4)
 - « en échec » again, or « bloqué » for anything else (a blocker that needs him, or work not merged — its copy kept: `copies` with `integrated: false`) → stop point (§4), once the rest is done: the gap in his terms, options, your recommendation
 - found beyond the spec (task wider than planned, neighbouring problem) → never added to this run → second spec (§8)
 
@@ -236,6 +256,7 @@ criteria pass → commit « spec : <nom> » → clean-up sub-agent → commit «
 
 **Commit, then clean up, still inside the run** — local commits on the current branch, yours, never his (with « étape N » or socle commits before them):
 1. « spec : <nom> »: the result (`merge --squash` of `result.branch` when `in: "integration"`, §7) + the ticked spec; you make it.
+   - the publication merged the result into a remote branch (`publication.done`, `ci.mergeRequest` merged) → no squash: bring his branch to it (`git pull --ff-only`), then the ticked spec alone in the commit · fast-forward impossible → stop point, never a force · the pushed branch stays on the remote unless his go listed its removal
 2. « nettoyage : <nom> »: one Opus medium sub-agent, given the project root, the spec, the « spec » commit, the `copies` of every run of this spec, the files this conversation created. Job: repository as clean as if done in one go, in a commit that can be undone on its own:
    - remove this spec's `copies` with `integrated: true` — `git worktree remove --force`, `git branch -D`, then the empty folder (their work is in the « spec » commit)
    - delete the temporary files, probes, logs and scratch files this conversation created
