@@ -110,6 +110,7 @@ Its arguments, and when the orchestrator passes them:
 | `recheck` | criteria an earlier run validated: re-checked by non-regression in the light check, judged again in the strict check; a « non vérifié » one carries `unverified: true` and is judged in full; with `criteria: []` and `finalCheck: "strict"`, the strict check alone |
 | `startEffort` | a relaunched criterion resumes from the effort it reached |
 | `envRepair` | a criterion broken by its environment or configuration: a targeted repair, re-judged by the critics that rejected it |
+| `rejectedBy` | a criterion relaunched after « en échec »: only the critics that rejected it judge it again |
 | `specBaseCommit` | every later run of a spec (a relaunch): the strict security and maintainer read the whole spec's changes |
 | `integrationBranch` | resuming an interrupted run whose run id is lost: the new run starts from the branch it left |
 | `waitRound` | resuming a run that stopped on an external wait (CI, registry, review) |

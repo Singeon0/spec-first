@@ -1,7 +1,7 @@
 export const meta = {
   name: 'run',
   description: 'spec-first autonomous run: small groups of criteria, a few at a time, each developed in its own copy, a group starting as soon as what it depends on is merged; three Opus high critics per round, and after a rejection only the critics that did not pass re-judge; developer effort escalation with triage (a slip, an approach, or the environment); a criterion broken only by its environment or configuration gets a targeted repair re-judged by the critics that rejected it; each validated group merged at once into an integration branch that later groups and rework start from, its copy then removed; every run ends with a light check of its own changes (a few Opus high judges, a quick non-regression), and the strict check (the full panel in Opus xhigh) runs once per spec, when every criterion passes; external waits (CI, registry, review) never hold an agent: the run stops cleanly, the orchestrator watches and resumes it; then, only if the owner authorized it with his go, the external actions he listed (push, merge request, CI, merge, tag, release), checked from outside',
-  whenToUse: 'Called by the spec-first skill after the owner gave his go on a spec. args: { specPath, projectRoot, baseCommit, criteria: [{ id, text }], groups?: [[ids]], testCommand?, quickTestCommand?, setupCommand?, subdir?, finalCheck?: "auto"|"light"|"strict"|false, strictDone?: boolean, recheck?: [{ id, text, unverified? }], startEffort?: { [id]: "medium"|"high"|"xhigh" }, envRepair?: { [id]: { defect, critics? } }, specBaseCommit?, integrationBranch?, maxGroups?: number, exclusive?: { [resource]: [ids] } | [string], publish?: { actions: string, criteria: [ids] }, dependsOn?: { [id]: [ids] }, waitRound?: number, budget?: number } with absolute paths. baseCommit is required: `git rev-parse HEAD` in projectRoot right before the call. An integration copy is made first; each group works in its own git worktree under <projectRoot>/.spec-first/copies, named after the spec, made from the integration branch; at most maxGroups groups (default 3) are active at once, the others wait; groups omitted → one group per criterion. dependsOn: the criteria each criterion builds on — the dependency graph of the whole spec, so one run covers it: independent groups start at once, a dependent group as soon as what it builds on is merged, without holding a slot while it waits. Every validated group is merged into one integration branch, which the skill squashes into the project at the end. testCommand: the full test suite, run only in the strict check; quickTestCommand: the fast subset developers, critics, fusions and the light check run (one critic per panel runs it, the others read its log). setupCommand: makes a fresh copy runnable, commit hooks included; subdir: the sub-folder of projectRoot where setup and tests run. finalCheck: "auto" (default) → the strict check when every criterion of the run (criteria and recheck) passes and no strict check of this spec ran before (strictDone), else the light check; "light", "strict" force one; false → none. strictDone: a strict check of this spec already ran in an earlier run. recheck: criteria an earlier run of the same spec validated — the light check re-checks them by non-regression, the strict check judges them again (unverified: true → one no run could judge: judged in full); criteria empty with recheck and finalCheck "strict" → the strict check alone. startEffort: the effort a relaunched criterion resumes from. envRepair: criteria an earlier run found broken by their environment or configuration (report: defect « environnement »), with that defect and the critics that rejected them: a targeted repair, re-judged by those critics only. specBaseCommit: the commit the whole spec started from, read by the strict security and maintainer critics. integrationBranch: the integration branch of an interrupted run to start from (its criteria go in recheck). exclusive: resources only one agent may use at a time, each with the criteria that need it (a plain list: every criterion) — the run holds the locks. publish: the external actions the owner authorized with his go and the criteria they make true, applied after the strict check. A remote pipeline, a registry, a review still running → the run returns « waiting » (what, where to look, the command that tells it is done) instead of holding an agent: resume it with resumeFromRunId, the same args and waitRound from the report. A criterion held only because what it depends on did not pass comes back blocked with kind « attente » (« en attente des dépendances »), waitingFor and relaunchAs: relaunch it as is with those criteria, in relaunchAs (recheck or criteria) — the publication criteria are one case, they depend on every other criterion (same publish). The report holds state: a readable state text to write to state.file. budget: output tokens; the run stops cleanly before it. Not for a bare slash-command call without args: tell the user to run /spec-first instead.',
+  whenToUse: 'Called by the spec-first skill after the owner gave his go on a spec. args: { specPath, projectRoot, baseCommit, criteria: [{ id, text }], groups?: [[ids]], testCommand?, quickTestCommand?, setupCommand?, subdir?, finalCheck?: "auto"|"light"|"strict"|false, specTotal?: number, strictDone?: boolean, recheck?: [{ id, text, unverified? }], startEffort?: { [id]: "medium"|"high"|"xhigh" }, envRepair?: { [id]: { defect, critics? } }, rejectedBy?: { [id]: [critics] }, specBaseCommit?, integrationBranch?, maxGroups?: number, exclusive?: { [resource]: [ids] } | [string], publish?: { actions: string, criteria: [ids] }, dependsOn?: { [id]: [ids] }, waitRound?: number, budget?: number } with absolute paths. baseCommit is required: `git rev-parse HEAD` in projectRoot right before the call. An integration copy is made first; each group works in its own git worktree under <projectRoot>/.spec-first/copies, named after the spec, made from the integration branch; at most maxGroups groups (default 3) are active at once, the others wait; groups omitted → one group per criterion. dependsOn: the criteria each criterion builds on — the dependency graph of the whole spec, so one run covers it: independent groups start at once, a dependent group as soon as what it builds on is merged, without holding a slot while it waits. Every validated group is merged into one integration branch, which the skill squashes into the project at the end. testCommand: the full test suite, run only in the strict check; quickTestCommand: the fast subset developers, critics, fusions and the light check run (one critic per panel runs it, the others read its log). setupCommand: makes a fresh copy runnable, commit hooks included; subdir: the sub-folder of projectRoot where setup and tests run. finalCheck: "auto" (default) → the strict check when every criterion of the run (criteria and recheck) passes and no strict check of this spec ran before (strictDone), else the light check; "light", "strict" force one; false → none. strictDone: a strict check of this spec already ran in an earlier run. recheck: criteria an earlier run of the same spec validated — the light check re-checks them by non-regression, the strict check judges them again (unverified: true → one no run could judge: judged in full); criteria empty with recheck and finalCheck "strict" → the strict check alone. startEffort: the effort a relaunched criterion resumes from. envRepair: criteria an earlier run found broken by their environment or configuration (report: defect « environnement »), with that defect and the critics that rejected them: a targeted repair, re-judged by those critics only. specBaseCommit: the commit the whole spec started from, read by the strict security and maintainer critics. integrationBranch: the integration branch of an interrupted run to start from (its criteria go in recheck). exclusive: resources only one agent may use at a time, each with the criteria that need it (a plain list: every criterion) — the run holds the locks. publish: the external actions the owner authorized with his go and the criteria they make true, applied after the strict check. A remote pipeline, a registry, a review still running → the run returns « waiting » (what, where to look, the command that tells it is done) instead of holding an agent: resume it with resumeFromRunId, the same args and waitRound from the report. A criterion held only because what it depends on did not pass comes back blocked with kind « attente » (« en attente des dépendances »), waitingFor and relaunchAs: relaunch it as is with those criteria, in relaunchAs (recheck or criteria) — the publication criteria are one case, they depend on every other criterion (same publish). The report holds state: a readable state text to write to state.file. budget: output tokens; the run stops cleanly before it. Not for a bare slash-command call without args: tell the user to run /spec-first instead.',
   phases: [
     { title: 'Développement', detail: 'opus, one developer per group, a few groups at a time; medium, then high, then xhigh after each rejection, sorting each rejection first: a slip to fix or an approach to change' },
     { title: 'Critique', detail: 'opus high: tester, owner and maintainer judge each criterion blind to each other; after a rejection, only the critics that did not pass judge again' },
@@ -106,6 +106,10 @@ const waiting = (unmet, relaunchAs) => ({
 // spec ran it (strictDone). Otherwise a light check: the run's changes and the criteria they touch,
 // a few Opus high judges, the earlier criteria by a quick non-regression. "auto" picks between them.
 const STRICT_DONE = input.strictDone === true
+// How many criteria the spec counts (sub-criteria each one): the strict check runs only on a run that
+// covers the whole spec — never on a relaunch that carries part of it.
+const SPEC_TOTAL = Number.isInteger(Number(input.specTotal)) && Number(input.specTotal) > 0 ? Number(input.specTotal) : 0
+if (input.specTotal != null && !SPEC_TOTAL) log(`specTotal ignoré (« ${input.specTotal} ») : ce doit être le nombre de critères de la spec.`)
 const FC = input.finalCheck
 let CHECK = FC == null || FC === 'auto' ? 'auto' : FC === true || FC === 'strict' ? 'strict' : FC === 'light' ? 'light' : FC === false || FC === 'none' ? 'none' : ''
 if (!CHECK) { CHECK = 'auto'; log(`finalCheck ignoré (« ${FC} ») : contrôle choisi par le run (strict si tout passe, léger sinon).`) }
@@ -195,6 +199,24 @@ if (input.envRepair != null) {
       if (!critIds.includes(id)) log(`envRepair ignoré pour « ${id} » : ${byId[id] ? 'critère de recheck, pas développé ici' : 'critère inconnu'}.`)
       else if (!defect) log(`envRepair ignoré pour « ${id} » : défaut non décrit.`)
       else ENV[id] = { defect, critics: [...new Set(['tester', ...(Array.isArray(o.critics) ? o.critics : []).map(asCritic).filter(k => IN_RUN.includes(k))])] }
+    }
+  }
+}
+
+// A criterion relaunched after « en échec »: only the critics that rejected it judge it again (the
+// tester always) — those that passed it are not run a second time. { id: [critics] } or
+// { id: { critics, proof } }, from the last report's rejectedBy and reason.
+const PRIOR = {}
+if (input.rejectedBy != null) {
+  if (typeof input.rejectedBy !== 'object' || Array.isArray(input.rejectedBy)) log('rejectedBy ignoré : ce doit être { id: [critiques] }.')
+  else {
+    const asCritic = k => ({ ci: 'tester', integrator: 'maintainer', security: 'maintainer' })[personaOf(String(k))] || personaOf(String(k))
+    for (const [id, v] of Object.entries(input.rejectedBy)) {
+      const o = Array.isArray(v) ? { critics: v } : (v && typeof v === 'object' ? v : {})
+      if (!critIds.includes(id)) { log(`rejectedBy ignoré pour « ${id} » : ${byId[id] ? 'critère de recheck, pas développé ici' : 'critère inconnu'}.`); continue }
+      if (ENV[id]) continue
+      const critics = [...new Set(['tester', ...(Array.isArray(o.critics) ? o.critics : []).map(asCritic).filter(k => IN_RUN.includes(k))])]
+      PRIOR[id] = { critics, proof: String(o.proof || o.reason || 'rejeté par le run précédent').trim() }
     }
   }
 }
@@ -299,7 +321,7 @@ const devSchema = ids => ({
         type: 'object',
         properties: {
           id: { type: 'string', enum: ids },
-          kind: { type: 'string', enum: ['slip', 'approach', 'environment'] },
+          kind: { type: 'string', enum: ['slip', 'approach', 'environment', 'mistaken'] },
           why: { type: 'string', description: 'the cause, in one sentence' },
         },
         required: ['id', 'kind', 'why'],
@@ -543,7 +565,9 @@ const changesHint = tree => `Changes of this run: \`git -C ${tree} diff ${BASE}\
 // Each panel's suite runs once, in the background, into a log the other critics read. The log's name
 // is unique to this run — its arguments (waitRound aside), and its integration copy, made with a
 // random name — and the same when the run is resumed: a stale « EXIT » is never read.
-const ARGS_TAG = hashOf(JSON.stringify({ ...input, waitRound: undefined })).toString(36) // a resume after an external wait keeps the same logs
+// Only what changes the work: the pace settings (maxGroups, budget, waitRound) stay out, so a run
+// relaunched faster (« accélère ») or with another budget keeps its logs and its finished agents.
+const ARGS_TAG = hashOf(JSON.stringify({ ...input, waitRound: undefined, maxGroups: undefined, budget: undefined })).toString(36)
 const copyTag = ws => (String(ws).split('/').slice(-2, -1)[0] || '').split('-').pop()
 const suitePath = name => `${ROOT}/.spec-first/logs/${SPEC_ID}-${ARGS_TAG}${integ.where ? `-${copyTag(integ.where)}` : ''}-${name}.log`
 const suiteCommand = (at, file, cmd) => `${ENSURE_HIDDEN} && mkdir -p .spec-first/logs && rm -f "${file}" && (cd "${at}" && ${cmd}) > "${file}" 2>&1; echo "EXIT $?" >> "${file}"`
@@ -757,7 +781,8 @@ ${leads.join('\n')}
 Before touching the code, sort each rejection and report it in "triage":
 - "slip": the approach holds, a detail is wrong → fix the cause at its root, not the symptom;
 - "approach": the way the criterion is built cannot satisfy it, or the same defect came back after a fix → drop that approach and take another; never patch it again;
-- "environment": the code is right, its environment or configuration is wrong (a config file, a setting, a local file the project expects) → fix exactly that, touch no code.
+- "environment": the code is right, its environment or configuration is wrong (a config file, a setting, a local file the project expects) → fix exactly that, touch no code;
+- "mistaken": the rejection contradicts the spec itself → in "why", quote the spec's sentence it contradicts, word for word, and change nothing for that criterion: the critics that rejected it judge it again with your quote. Once per criterion: rejected again after that, it is a "slip" or an "approach". Never "mistaken" to dodge a defect you can reproduce.
 A criterion rejected twice for the same reason is always "approach".
 `
 }
@@ -857,6 +882,9 @@ async function runGroup(g) {
   const locks = locksFor(ids)
   // What this group builds on, from other groups or an earlier run: merged before it starts.
   const needs = [...new Set(g.criteria.flatMap(c => DEPS[c.id] || []))].filter(d => !ids.includes(d))
+  // A retry after a failed fusion: the group's judged work waits on its old branch.
+  const carry = g.carry ? `
+This group's work was already judged by the critics, but its fusion into the integration branch failed (${g.carry.why}). It is on branch ${g.carry.branch}: first bring it into your copy — \`git merge --no-edit ${g.carry.branch}\` —, resolve any conflict keeping both intents (what is merged and this work), commit, then make every criterion hold again on the merged result.` : ''
   const depNote = needs.length ? `
 Your criteria build on criteria ${needs.join(', ')}, done elsewhere: they are already merged into the branch your copy starts from. Missing or broken there → blocker "${DEPENDS} ${needs.join(', ')} — why", never a workaround.` : ''
   const results = {}
@@ -877,6 +905,7 @@ Your criteria build on criteria ${needs.join(', ')}, done elsewhere: they are al
   let nudge = ''
   let blocker = ''
   let round = 0
+  const disputed = new Set() // criteria whose rejection the developer disputed with the spec's words
   // An error thrown by an agent (a hard budget, a breakdown) stops this group only: what its critics
   // already validated, and its copy, are kept and merged as usual.
   try {
@@ -902,7 +931,7 @@ First bring in what other groups already merged, so your fix starts from it: \`g
 Spec: ${SPEC} — read it first (goal, criteria, out of scope).
 Your criteria:
 ${list(pending)}
-${done.length ? `Already validated in this group — keep them working:\n${list(done, 'validated_criteria')}\n` : ''}Other criteria of the spec belong to other developers, who may touch the same files: do not implement them.${depNote}${pubIds.length ? `
+${done.length ? `Already validated in this group — keep them working:\n${list(done, 'validated_criteria')}\n` : ''}Other criteria of the spec belong to other developers, who may touch the same files: do not implement them.${depNote}${carry}${pubIds.length ? `
 Criteria ${pubIds.join(', ')} are publication criteria: prepare everything they need (version, changelog, files), but never push or publish — a later phase does it, with the owner's authorization.` : ''}
 
 ${env && round === 0 ? `
@@ -933,7 +962,12 @@ ${COMMON_RULES}`
       }
       // Stopped without doing anything and without saying why: a new round one tier up, not a block —
       // even on a first round that made no copy at all.
-      const idle = !dev.changed && !dev.blocker
+      // A rejection disputed with the spec's own words (« mistaken », once per criterion): no change
+      // needed, the critics that rejected it judge it again with the quote — not a round lost.
+      const disputes = (dev.triage || []).filter(t => t.kind === 'mistaken' && !disputed.has(String(t.id)) && pending.some(c => c.id === String(t.id)))
+      for (const t of disputes) disputed.add(String(t.id))
+      const disputeOnly = round > 0 && !dev.changed && !dev.blocker && disputes.length > 0
+      const idle = !dev.changed && !dev.blocker && !disputeOnly
       let noCopy = false
       if (isolated) {
         const ws = clean(dev.workspace)
@@ -976,12 +1010,21 @@ ${COMMON_RULES}`
       const mergedIn = from !== BASE || !!catchUp
       const context = `<developer_claims>
 Summary: ${dev.summary}
-Self-check: ${(dev.selfCheck || []).map(s => `[${s.id}] ${s.status}: ${s.evidence}`).join(' | ') || 'none'}
+Self-check: ${(dev.selfCheck || []).map(s => `[${s.id}] ${s.status}: ${s.evidence}`).join(' | ') || 'none'}${(dev.triage || []).length ? `
+Triage of the last rejections: ${dev.triage.map(t => `[${t.id}] ${t.kind}: ${t.why}`).join(' | ')}` : ''}
 </developer_claims>
-These are claims, not evidence.
+These are claims, not evidence. A rejection marked "mistaken" quotes the spec: read that sentence in the spec yourself — if it says what the developer quotes and it settles the point, your earlier rejection falls; if not, keep it and say why in one sentence.
 ${changesHint(where)}${mergedIn ? ' Work merged into this copy before (other groups, an earlier run) is part of that diff: judge only your criteria.' : ''}`
       // A targeted repair starts as a re-judgement: its critics get the defect they had proved.
-      const panel = round === 0
+      // A relaunch after « en échec »: its first round is a re-judgement by the critics that rejected it.
+      if (round === 0 && !env) {
+        for (const c of pending) {
+          const pr = PRIOR[c.id]
+          if (pr) for (const k of KEYS) book[c.id][k] = pr.critics.includes(k) ? { verdict: 'defect', proof: pr.proof } : { verdict: 'pass', proof: 'validé par ce critique au run précédent' }
+        }
+      }
+      const relaunch = round === 0 && !env && pending.every(c => PRIOR[c.id])
+      const panel = round === 0 && !relaunch
         ? KEYS.map(k => ({ ...defs[k], criteria: pending, ...(env ? { previous: pending.map(c => [c.id, { verdict: 'defect', proof: env.defect }]) } : {}) }))
         : recheckSeats(pending, book, () => KEYS, defs)
       // One critic runs the quick suite for the panel, the others read its log.
@@ -1033,6 +1076,7 @@ let fuseTail = Promise.resolve()
 function fuseQueued(r) {
   const p = fuseTail.then(() => fuse(r)).catch(() => {
     keepBlocked(r, `Non intégré — la fusion s'est arrêtée sur une erreur ; travail conservé sur la branche ${r.branch}.`)
+    r.fusionFailed = "l'intégrateur s'est arrêté sur une erreur"
     log(`Fusion : groupe ${r.group} non intégré (erreur)`)
   })
   fuseTail = p
@@ -1082,6 +1126,7 @@ ${COMMON_RULES}`, { ...FUSION, schema: FUSION_SCHEMA, phase: 'Fusion', label: `F
     }
   } else {
     keepBlocked(r, `Non intégré — travail conservé sur la branche ${r.branch}.${res ? (res.reason ? ` ${res.reason}` : '') : " L'intégrateur n'a pas répondu, deux fois."}`)
+    r.fusionFailed = res ? (res.reason || 'conflit non résolu') : "l'intégrateur n'a pas répondu"
     log(`Fusion : groupe ${r.group} non intégré, copie conservée`)
   }
 }
@@ -1217,6 +1262,30 @@ else if (GROUPS.length) await parallel(Array.from({ length: Math.min(MAX_GROUPS,
 GROUPS.forEach((g, i) => { if (!groupResults[i]) groupResults[i] = stoppedGroup(g, 'crashed', "le groupe s'est arrêté sur une erreur (panne)") })
 await fuseTail
 
+// A failed fusion never stops the run: the group is developed once more from the integration branch,
+// which already holds the other groups' work, bringing in its judged branch, then judged and merged again.
+{
+  const failed = groupResults.filter(r => r.fusionFailed && r.branch && integ.where)
+  const retried = await parallel(failed.map((r, k) => async () => {
+    const ids = r.criteria.filter(id => (r.results[id] || {}).kind === 'technique' && String(r.results[id].reason || '').startsWith('Non intégré'))
+    if (!ids.length || overBudget(`la reprise du groupe ${r.group}`)) return null
+    log(`Fusion ratée du groupe ${r.group} : ${plural(ids, 'son critère repart', 'ses critères repartent')} une fois depuis la branche d'intégration`)
+    try {
+      const again = await runGroup({ id: String(60 + k), criteria: ids.map(id => byId[id]), carry: { branch: r.branch, why: r.fusionFailed } })
+      await again.fusion
+      for (const id of ids) if (again.results[id]) r.results[id] = { ...again.results[id], retriedAfterFusion: true }
+      // Its old branch was merged into the retry: once the retry is integrated, nothing is lost with it.
+      if (again.integrated) { r.integrated = true; r.fusionFailed = '' }
+      return again
+    } catch (e) {
+      log(`Reprise du groupe ${r.group} : arrêt sur une erreur (${errText(e)})`)
+      return null
+    }
+  }))
+  for (const a of retried || []) if (a && a.where) groupResults.push({ ...a, results: {} })
+  await fuseTail
+}
+
 // No group copy stays in the project for the check that ends the run: its folders (.venv, node_modules)
 // disturb the project's own tools. Work never merged stays on its branch.
 const leftovers = groupResults.filter(r => r.where && !r.removed)
@@ -1311,7 +1380,15 @@ ${COMMON_RULES}`, { ...HELPER, schema: COPY_SCHEMA, phase: phaseTitle, label: `C
 // An error thrown by an agent stops the check, never the report: what was judged stays judged.
 let finalCheck = null
 const passingIds = ALL.filter(c => PASSING.includes((status[c.id] || {}).status)).map(c => c.id)
-const allPass = ALL.length > 0 && passingIds.length === ALL.length
+// The strict check needs every criterion validated: one « non vérifié » of this run keeps it light
+// (an earlier run's criterion, re-checked by the strict check itself, still counts).
+const strictReady = id => {
+  const st = status[id] || {}
+  return st.status === 'validated' || (st.status === 'unverified' && !!st.earlierRun)
+}
+const coversSpec = !SPEC_TOTAL || ALL.length >= SPEC_TOTAL
+if (!coversSpec) log(`Contrôle strict impossible dans ce run : il porte sur ${ALL.length} critère(s), la spec en compte ${SPEC_TOTAL} (passer les autres en recheck).`)
+const allPass = ALL.length > 0 && coversSpec && ALL.every(c => strictReady(c.id))
 const MODE = CHECK === 'auto' ? (allPass && !STRICT_DONE ? 'strict' : 'light') : CHECK
 const STRICT = MODE === 'strict'
 const combinedRun = integratedGroups.length > 1 || !!IB
@@ -1727,7 +1804,9 @@ return {
   fusions,
   finalCheck,
   check: checkLine,
-  strictCheck: STRICT_RAN || STRICT_DONE,
+  // Done only when it validated the whole spec: a criterion it left failed or « non vérifié » → the
+  // spec's strict check is still to come, on the run that completes it.
+  strictCheck: STRICT_DONE || (STRICT_RAN && counts.total > 0 && counts.validated === counts.total),
   strictPending,
   waiting: waitingOut,
   state: { file: `${ROOT}/${COPIES}/${SPEC_ID}--etat.md`, text: stateText },

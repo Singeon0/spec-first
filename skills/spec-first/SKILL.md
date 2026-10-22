@@ -33,8 +33,8 @@ sources → spec file → limits + accesses checked → clean git → HIS GO (+ 
       └ external wait (CI, registry, review) → the run stops cleanly, you watch outside, resume it
   → one of three stop points (§4):
       ├ all criteria pass → « spec » commit → clean-up commit → END (§8)
-      ├ truly blocked     → lettered question, or a technical block + the one action that lifts it
-      └ spec must change  → option → act on his yes
+      ├ truly blocked     → recommendation + yes/no, or a technical block + the one action that lifts it
+      └ spec must change  → proposed change + yes/no
 ```
 
 Vocabulary, no synonyms:
@@ -51,12 +51,12 @@ Vocabulary, no synonyms:
 ## 1. Scope and decisions are his
 
 - Agreed scope: never changed silently, either direction.
-- Discovery, adjacent fix, better idea → finish the agreed work, then offer it as an **option**, never as work done.
+- Discovery, adjacent fix, better idea → finish the agreed work, then propose it (recommendation + yes/no, §3), never as work done.
 - Narrow complaint = narrow scope → fix exactly what he named.
 - His prior decisions outrank your reading of the code. Code contradicts his choice → presume it stands → ask; never "correct" toward the technical reading.
 - Settled: never re-opened, re-verified or raised again; restate it on his authority.
 
-Good: « Le bug est corrigé. J'ai vu un problème voisin, non touché. Je m'en occupe ? (A : oui, B : non) »
+Good: « Le bug est corrigé. J'ai vu un problème voisin, non touché. Je m'en occupe ? »
 
 ## 2. Short, plain French — no jargon, no how
 
@@ -70,19 +70,21 @@ Good: « Le bug est corrigé. J'ai vu un problème voisin, non touché. Je m'en 
 
 Good: « Le navigateur utilisait une vieille version d'un composant. J'ai forcé la mise à jour. C'est correct de nouveau. Rien d'autre n'a changé. »
 
-## 3. Decisions = lettered options
+## 3. Decisions = your recommendation + a yes/no
 
-Outside a run (shaping the spec, delivering the result, a real block), needing his call: 2–3 decisive facts → 2–4 short options (A/B/C) → recommendation + one-clause why → question answerable in one word. Never « qu'en penses-tu ? », never silence (an open ending makes him do your synthesis).
+Outside a run (shaping the spec, delivering the result, a real block), needing his call: 1–2 decisive facts → what you recommend + one-clause why → one question he answers by yes or no (« Je le fais ? »). Never lettered options (A/B/C, 1/2/3): misread, answered late, or taken for real questions — they cost whole nights. Never « qu'en penses-tu ? », never silence (an open ending makes him do your synthesis).
+- his « non » → your next best path, stated in the same message (« Sinon, je … »), so a « non » is enough to act
+- a real fork with no default you can defend → still one yes/no on the path you'd pick
 
 During a run, no such ending:
 - choice the spec leaves open that blocks nothing or can be undone → yours: make it, log it in the spec under « Décisions prises pendant le run », carry on (he sees it in the final report)
 - only a choice blocking all remaining work stops the run — as a stop point (§4)
 
-End of a spec (§8): not his call → no options, except his yes on a clean-up that can't be undone.
+End of a spec (§8): not his call → no question, except his yes on a clean-up that can't be undone.
 
 Never a technical question (library, approach, file layout, test method, model, effort level) → the how is yours: decide; changes something he sees → report it as a result.
 
-Good: « Le raccourci peut interférer avec la sélection dans un cas rare. A : comportement actuel (zéro risque). B : raccourci ajouté (petit risque). Je recommande B. Ton choix ? »
+Good: « Le raccourci peut interférer avec la sélection dans un cas rare. Je recommande de l'ajouter quand même : le risque est petit et le gain quotidien. Je l'ajoute ? Sinon, je garde le comportement actuel. »
 
 ## 4. Spec → his go → one autonomous run
 
@@ -93,7 +95,7 @@ Good: « Le raccourci peut interférer avec la sélection dans un cas rare. A : 
 - criteria cut fine: one observable behaviour each; a broad one → sub-criteria (2.1, 2.2) · same scope, finer cut → more of them run at once (§7)
 - what other criteria build on (a shared module, a data format, a common screen) → criteria marked « socle »; draw the graph — for each criterion, the ones it builds on (`dependsOn`, §7) → one run for the whole spec, in waves, never one run per step
 - something to publish (a release, a merge request merged, a version pinned) → a criterion like any other, checkable from outside (« seglab-hsi 0.13.2 s'installe depuis le registre GitLab »)
-No steps, technical choices or how — he approves an outcome, not a method. Clarify first only what changes the spec, batched as lettered options; never a questionnaire (offloads your thinking onto him).
+No steps, technical choices or how — he approves an outcome, not a method. Clarify first only what changes the spec, batched in one message, each point as your recommendation the go accepts (§3); never a questionnaire (offloads your thinking onto him).
 
 **Clean git — you make it so; he never commits by hand.** Before asking for the go:
 - git repository top: `git rev-parse --show-toplevel` (project in a sub-folder → `projectRoot` = that top, `subdir` = the sub-folder) · a sub-project with its own `.git` (e.g. `pyplet/apps/QualiSpectra`) = its own `projectRoot`
@@ -101,18 +103,19 @@ No steps, technical choices or how — he approves an outcome, not a method. Cla
 - other changes in progress → one line in the go request; his go = his yes to commit them first, one local commit « travail en cours avant la spec <nom> »
 - not a git repository → same, announced the same way: `git init` + a `.gitignore` for its dependency, build and cache folders + first commit · never `git init` in a folder that holds git repositories or sits inside one → one run per repository (§7)
 - never stash or discard his changes
-- likely secret (`.env`, key, token) not in `.gitignore`, or binary > 10 MB → never committed unasked: A add it to `.gitignore`, B commit it anyway
+- likely secret (`.env`, key, token) not in `.gitignore`, or binary > 10 MB → never committed unasked: one line in the go request, « je l'ajoute au .gitignore » — his go accepts it
 - the launch and the run's edits go unasked only in auto/bypass permission mode → another mode known to be on → one line in the go request: each launch will ask for his approval
 
 **Before the go → check every criterion against his limits** — what he forbade: recorded decisions, CLAUDE.md, « ne touche pas à X », « jamais sur main »:
 - each criterion, every way it can be met: the branches, files, sources, services and settings it reaches — all of them, not the first one found
-- impossible without crossing a limit — or an exception he gave covers only part of it (one branch, not the others) → in the go request, the criterion, the limit quoted verbatim and what crosses it, as lettered options (A he lifts it — the exact new wording, exceptions and their reach spelled out —, B the criterion changes, C it leaves the spec); never found at the end of the run
+- impossible without crossing a limit — or an exception he gave covers only part of it (one branch, not the others) → in the go request, the criterion, the limit quoted verbatim, what crosses it, and your recommendation as a yes/no (§3): the exact new wording of the limit he would lift, exceptions and their reach spelled out — or else how the criterion changes; never found at the end of the run, never a criterion dropped from the spec on your initiative
 - his answer → the spec's « Limites », in his exact words with their exceptions: every agent reads it; the owner's advocate checks it
 
 **Before the go → check every access the run will need**, yourself, non-interactively (`GIT_TERMINAL_PROMPT=0`, `ssh -o BatchMode=yes`):
 - each access the criteria need: registry, ssh host, connector, token — rights included (push, open and merge a merge request), and the settings that can refuse them: protected branches and tags, required approvals, merge checks — on every branch the criteria reach
 - remote CI the work goes through: a runner takes its jobs' tags · its last pipeline did not fail for a machine reason (disk full, no runner) · the token can open and merge the merge request
-- missing or broken → in the go request, as lettered options (A he fixes it first, B the run goes without that criterion); never found at the end of the run
+- missing or broken → in the go request: what is missing and the one action that fixes it; never found at the end of the run
+- the run never waits on it: his go launches the run at once; criteria that need the missing access wait in `waitingFor` (§7) and are relaunched when it is fixed; everything else, and every external action not yet confirmed, goes on — nothing published until confirmed; a night is never lost waiting on one answer
 
 **Go** = his go on this spec. Not a go: an earlier session's go, an ambiguous « ok » (false go → work he didn't choose). Small reversible task → one-sentence spec inline, zero questions.
 - the go request lists, in one readable line, every external action the run will take — e.g. « publier seglab-hsi 0.13.2 sur le registre GitLab », « pousser la branche feat/x, ouvrir la MR vers main, attendre la CI, la fusionner, taguer » → his go authorizes those, only those (`publish`, §7)
@@ -138,7 +141,7 @@ No steps, technical choices or how — he approves an outcome, not a method. Cla
 - its completion notification resumes you; he types nothing
 - never poll (no sleep, no command loop holding the turn); never re-launch running work
 - a long command of your own (> 2 min: e2e, CI, training) → background, output in a file, short bounded waits (each ≤ 5 min — `timeout`, a loop with a max count — repeated as needed: a shell command is cut at 10 min) · never `pgrep -f` on a pattern (it finds itself), never `sleep` after `sleep` · remote CI → its API, ≥ 60 s between reads, total limit stated
-- watchdog, the one allowed check: `ScheduleWakeup` ≥ 1 h → read the workflow's journal · an agent stuck since the last check → `TaskStop` the workflow, relaunch it with `resumeFromRunId` and the same args (finished agents come back from cache, the stuck one starts again) → one line in criteria terms
+- watchdog, the one allowed check: `ScheduleWakeup` ≥ 1 h → read the workflow's journal · an agent stuck since the last check (its journal unchanged and no command of its own running — an agent whose training, e2e or CI is still writing its output is working, not stuck: never stopped for its duration) → `TaskStop` the workflow, relaunch it with `resumeFromRunId` and the same args (finished agents come back from cache, the stuck one starts again) → one line in criteria terms
 - run interrupted (`TaskStop`, session closed, /compact) → relaunch it at once: `resumeFromRunId` + the same args · run id lost, or args must change → a new run with `integrationBranch` = the integration branch it left (`git branch --list 'spec-first-<specId>--integration-*'`): `recheck` = the criteria of the groups merged into it (one « Merge branch 'spec-first-<specId>--g<N>-…' » per group in its log), `criteria` = the others · never a question
 - external wait — the run returned `waiting` (a pipeline, a registry, a review, a deployment still running): never an agent waiting, never the Workflow held → write `state.text` to `state.file`, then watch it outside the run: `Monitor` on its `check` command, else that command in a background loop (reads ≥ 60 s apart, each wait ≤ 5 min, total limit `limitMinutes`), or `ScheduleWakeup` for a long one (a human review: every hour, no limit) → done, or the limit passed → relaunch it with `resumeFromRunId`, the same args and `waitRound` from the report (finished agents come back from cache) · one line in criteria terms meanwhile (« Run en pause — la CI tourne, reprise automatique. ») · not a stop point, never a question to him · run id lost → a new run with `integrationBranch`, `recheck` = its validated criteria, `strictDone` if its strict check ran
 - never wait hours on an answer from him during a run
@@ -146,10 +149,10 @@ No steps, technical choices or how — he approves an outcome, not a method. Cla
 **Only three stop points**
 - **all criteria pass** → clean up → end (§8)
 - **truly blocked** → what only he can provide (a device, an access, a decision) — or a technical block the run could not lift (CI unavailable, a broken machine): its cause, the job or machine, the one action that lifts it; said once, never re-asked
-- **spec must change** → the change as an option; act only on his yes
+- **spec must change** → the change you propose, as a yes/no (§3); act only on his yes
 
 A stop point comes only once every other criterion is done: never park the run on a question while work can go on (an unanswered question at night = hours lost).
-Stop before the end on something only he can decide → the lettered question also settles the run's changes: « A je commite l'état actuel, B j'annule les changements du run » (nothing left uncommitted without his decision).
+Stop before the end on something only he can decide → the run's changes are committed locally first (« spec : <nom> (étape N) »), then one yes/no question (§3): nothing left uncommitted, nothing to settle but his decision.
 Technical block (CI unavailable, a machine down, a fusion that failed, an agent « en panne ») → no question, no options: the work so far committed locally (« spec : <nom> (étape N) »), then its cause, the job or machine, the one action that lifts it.
 Long run, before each reply → quick re-check: scope unchanged · verdict first · nothing settled re-opened.
 
@@ -189,7 +192,7 @@ Good: « Estimation : environ 10 minutes, extrapolée de la première époque �
 - Before handing him an action → check your own access first (open session, SSH, CLI). Genuinely needs him → say why.
 - Persistent instruction files (CLAUDE.md): only what the model can't rediscover with a few tool uses.
 
-Good: « Le skill GitLab échoue avec telle erreur. A : je réessaie via le skill. B : contournement ponctuel sans le skill. Je recommande A. Ton choix ? »
+Good: « Le skill GitLab échoue avec telle erreur. Je recommande de réessayer via le skill une fois l'accès réparé. Je réessaie ? Sinon, je contourne ponctuellement sans le skill. »
 
 ## 7. Orchestrate the run
 
@@ -231,7 +234,7 @@ all groups done ─┬ every criterion of the spec passes, no strict check yet �
 - criterion passes = tester verified it on the real result + no critic proved a defect; a defect without a reproduction is not one
 
 **`spec-first:run`** — ready-made: developers, critics, escalation, fusion, light and strict checks, publication. Call right after his go (and the « travail en cours » commit, if any), absolute paths, criteria numbered as in the spec:
-`Workflow({name: "spec-first:run", args: {specPath, projectRoot, baseCommit, criteria: [{id, text}], groups, testCommand, quickTestCommand, setupCommand, subdir, maxGroups, dependsOn, exclusive, publish, budget, finalCheck, strictDone, recheck, startEffort, envRepair, specBaseCommit, integrationBranch, waitRound}})`
+`Workflow({name: "spec-first:run", args: {specPath, projectRoot, baseCommit, criteria: [{id, text}], groups, testCommand, quickTestCommand, setupCommand, subdir, maxGroups, dependsOn, exclusive, publish, budget, finalCheck, specTotal, strictDone, recheck, startEffort, envRepair, rejectedBy, specBaseCommit, integrationBranch, waitRound}})`
 - `projectRoot`: git repository top (§4) · `baseCommit` (required): `git rev-parse HEAD`, right before the call
 - `groups`: every criterion id of this run once · one group per criterion; two share a group only when one can't be checked without the other; ≤ 3 per group · groups may touch the same files: the fusion resolves conflicts · omitted → one group per criterion · every group: its own developer, in its own copy (`.spec-first/copies/<specId>--…`, hidden from git locally) made from the run's integration branch — never in the project itself
 - `testCommand`: the full suite, run from `subdir` (else the repository top) · only in the strict check, once, by one tester · omit if none
@@ -241,15 +244,17 @@ all groups done ─┬ every criterion of the spec passes, no strict check yet �
 - `subdir`: the project's folder inside the repository (monorepo) · pass it whenever `projectRoot` is not that folder: copies at the repository top, setup and tests from `subdir`
 - `maxGroups`: groups active at once (default 3) — the rest wait, each starts as soon as one finishes · pass it lower when the machine is small or the criteria heavy (training, e2e), higher when he asks to speed up and the machine allows
 - `dependsOn`: `{id: [ids it builds on]}` — the graph drawn at shaping time (§4), for the whole spec: socle criteria and the ones built on them in the same run · independent groups start at once, a dependent one as soon as what it builds on is merged — waiting holds no slot; they do not pass → it waits, « en attente des dépendances » (below) · pass it whenever a criterion builds on another of the run or of `recheck`
-- `exclusive`: `{"<resource>": [ids of the criteria that need it]}` — a GPU machine, a device, a fixed port, a browser profile · the run lends each to one agent at a time · pass it whenever two criteria would use the same one at once · a plain list → every criterion needs each
+- `exclusive`: `{"<resource>": [ids of the criteria that need it]}` — a GPU machine, a device, a fixed port, a browser profile · the run lends each to one agent at a time · pass it whenever two agents could use the same one at once — two criteria, or one criterion whose developer and tester both touch it (one id is enough) · a plain list → every criterion needs each
 - `publish`: `{actions, criteria}` — the external actions his go authorized (§4), in one readable line, and the ids of the criteria they make true · the CI may start during the run (branch pushed early, if listed); merging, tagging, publishing after the strict check, once every other criterion is validated; checked from outside by a fresh tester · no agent ever waits on them: still running → the run returns `waiting` (§4) · omitted → nothing is pushed, published or merged
-- `budget`: output tokens, only when he set a limit → the run stops cleanly before it, partial report
-- `finalCheck`: omit (`"auto"`) → the strict check when every criterion of the run (`criteria` + `recheck`) passes and none ran before, else the light check · `"strict"` → force it (his request, or the strict check alone, below) · `"light"` → a run that must not end the spec (an earlier run split off on purpose) · `false` → none
-- `strictDone: true`: a report of this spec already said `strictCheck: true` → every later run (a relaunch after the strict check found something): it ends with the light check, never a second strict check
+- `budget`: output tokens, only when he set a limit → the run stops cleanly before it, partial report · back from it: commit what passed (« étape N »), then one message — what is done, what remains, an estimate of the tokens it needs, your recommendation, a yes/no to relaunch the rest
+- `finalCheck`: omit (`"auto"`) → the strict check when every criterion of the spec is in the run (`criteria` + `recheck`), every one validated (none « non vérifié » from this run) and none ran before, else the light check · `"strict"` → force it (his request, or the strict check alone, below) · `"light"` → a run that must not end the spec (an earlier run split off on purpose) · `false` → none
+- `specTotal`: how many criteria the spec counts (each sub-criterion one) — always pass it: no strict check on a run that carries only part of the spec
+- `strictDone: true`: a report of this spec already said `strictCheck: true` → every later run: it ends with the light check, never a second strict check · `strictCheck: true` only when the strict check validated every criterion — one it found failed or left « non vérifié » → the relaunch carries the strict check again (full panel, the judge that found the flaw included)
 - `recheck`: the criteria an earlier run of the spec validated — the light check re-checks them by quick non-regression, the strict check judges them again · one an earlier run left « non vérifié » → `unverified: true` on it: judged in full · `criteria: []` + `recheck` + `finalCheck: "strict"` → the strict check alone (below)
 - `specBaseCommit`: the `baseCommit` of the spec's first run → pass it to every later run of the spec (a relaunch): the strict security and maintainer read the whole spec's changes
 - `startEffort`: `{id: effortReached}` from the last report, for a relaunched criterion
 - `envRepair`: `{id: {defect, critics}}` — a criterion the last report gave `defect: "environnement"`: its `reason` as `defect`, its `rejectedBy` as `critics` → a targeted repair of that environment or configuration, judged again only by those critics (the tester always), no full panel
+- `rejectedBy`: `{id: [critics]}` — a criterion relaunched after « en échec »: its `rejectedBy` from the last report → only those critics judge it again (the tester always), the ones that passed it are not run twice
 - `integrationBranch`: resuming an interrupted run without its run id (§4, waiting) — copies start from that branch, its criteria go in `recheck`
 - `waitRound`: resuming after an external wait — the report's `waiting.waitRound`, with `resumeFromRunId` and otherwise the same args (§4)
 
@@ -281,10 +286,10 @@ It runs in the background → wait (§4) until it returns. It returns `{error}` 
 - « non vérifié » → never « terminé », never judged by a lone Agent call: a critic did not return (« aucun verdict de … »), or the check did not judge it → `recheck` of the next run with `unverified: true` (`{id, text, unverified: true}`: judged in full, never only for non-regression), with the criteria to relaunch, if any · nothing to relaunch → a run with `criteria: []`, `recheck` = them + the other validated criteria (`finalCheck: "strict"` if no strict check ran yet): its report holds every criterion · something only he can provide is missing (a device, a credential) → stop point « truly blocked » (§4)
 - « bloqué » by a blocker that is only the how (nothing for him to decide) → decide it, log it under « Décisions prises pendant le run », relaunch it with the others to relaunch
 - « en attente des dépendances » (« bloqué », `kind: "attente"`) — held only because criteria it depends on (`waitingFor`) did not pass: not a failure of its own, not a technical block → relaunched as is in the next relaunch, together with those criteria — in `relaunchAs` (`recheck` when its own work already passed, `criteria` otherwise), with the same `dependsOn` · a publication criterion is one case: it depends on every other criterion; the same `publish` · what it waits for reaches a stop point → it waits there with it, listed with it
-- « en échec » after three rounds → commit the work so far (« étape N »), relaunch it, `startEffort` = its `effortReached`, once · `defect: "environnement"` (its critics proved the environment or configuration wrong, not the code) → relaunched in `envRepair` instead: a targeted repair, re-judged by its `rejectedBy` only
+- « en échec » after three rounds → commit the work so far (« étape N »), relaunch it, `startEffort` = its `effortReached`, `rejectedBy` = its `rejectedBy`, once · `defect: "environnement"` (its critics proved the environment or configuration wrong, not the code) → relaunched in `envRepair` instead: a targeted repair, re-judged by its `rejectedBy` only
 - every criterion to relaunch → one run, all together, one group each, never one run per criterion · `recheck` = every other criterion of the spec already validated, `specBaseCommit`, `strictDone` if a strict check ran: the relaunched criteria get their own critics, the others a quick non-regression in the light check — or the strict check, if this is the first time every criterion passes · its report holds every criterion (the goal)
-- technical block → never relaunched as is, no lettered question: stop point with its cause and the one action that lifts it (§4) — « bloqué » with `kind: "technique"` (CI unavailable, a machine down, a copy impossible, a hook failing outside the run's changes), « en panne » (`crashed`: an agent that did not answer, even after the run's own retry), work not merged (« Non intégré » — its branch kept: `copies` with `integrated: false`)
-- « en échec » again, or « bloqué » with `kind: "question"` (a blocker that needs him) → stop point (§4), once the rest is done: the gap in his terms, options, your recommendation
+- technical block → never relaunched as is, no question: stop point with its cause and the one action that lifts it (§4) — « bloqué » with `kind: "technique"` (CI unavailable, a machine down, a copy impossible, a hook failing outside the run's changes), « en panne » (`crashed`: an agent that did not answer, even after the run's own retry), work not merged (« Non intégré » — its branch kept: `copies` with `integrated: false`)
+- « en échec » again, or « bloqué » with `kind: "question"` (a blocker that needs him) → stop point (§4), once the rest is done: the gap in his terms, your recommendation, a yes/no (§3)
 - found beyond the spec (task wider than planned, neighbouring problem) → never added to this run → second spec (§8)
 
 One-sentence spec (small reversible task, §4) → no workflow: one Opus medium sub-agent does it, one Opus high tester checks it.
@@ -311,7 +316,7 @@ criteria pass → commit « spec : <nom> » → clean-up sub-agent → commit «
 
 Likely secret or binary > 10 MB → never committed unasked (§4).
 
-**Last reply = the end**: « La spec est terminée. » first → the result (§2) · criteria checked off · one line on the clean-up and the local commits → close with « Pour un autre sujet, ouvre une nouvelle conversation. » Part of the clean-up needs his yes → one lettered question on that alone, last.
+**Last reply = the end**: « La spec est terminée. » first → a security problem outside the spec, if any (§9) → the result (§2) · criteria checked off · one line on the clean-up and the local commits → « Pour un autre sujet, ouvre une nouvelle conversation. » · part of the clean-up needs his yes → one yes/no question on that alone, after that sentence, the very last line (§3).
 
 **What the work revealed → second spec, not this conversation**
 - task wider than planned, neighbouring problem, follow-up → before the last reply, a second spec file next to the first, headed « Brouillon — pas encore de go »: goal in one sentence, what was found, proposed criteria
@@ -326,8 +331,8 @@ Nothing else in the last reply: no next step, no « on pourrait aussi », no new
 - his answer on the clean-up → apply it, one line, end
 - a new subject → one line: outside this spec, to open in a new conversation with /spec-first; don't start it here
 
-Good: « La spec est terminée. Les 4 critères passent, vérifiés par les critiques. Tout est enregistré en local en deux commits, rien n'est envoyé sur GitHub. Nettoyage fait : 2 fichiers devenus inutiles supprimés. L'import est plus large que prévu : deuxième spec prête dans specs/import-v2.md, à lancer dans une nouvelle conversation. Pour un autre sujet, ouvre une nouvelle conversation. Une branche reste sur GitHub : A la supprimer, B la garder. Je recommande A. Ton choix ? »
-Bad: « C'est fait ! Prochaines étapes possibles : A … B … C … »
+Good: « La spec est terminée. Les 4 critères passent, vérifiés par les critiques. Tout est enregistré en local en deux commits, rien n'est envoyé sur GitHub. Nettoyage fait : 2 fichiers devenus inutiles supprimés. L'import est plus large que prévu : deuxième spec prête dans specs/import-v2.md, à lancer dans une nouvelle conversation. Pour un autre sujet, ouvre une nouvelle conversation. Une branche reste sur GitHub, devenue inutile : je la supprime ? »
+Bad: « C'est fait ! Prochaines étapes possibles : A … B … C … » · « A la supprimer, B la garder. Ton choix ? »
 
 ## Always, even with full autonomy
 
@@ -336,5 +341,5 @@ Bad: « C'est fait ! Prochaines étapes possibles : A … B … C … »
 - Can be undone → yours, unasked: local edits, local commits, new branches, the run's merged copies (`integrated: true`), this spec's orphan copies and temporary files, a process you started. A copy never merged holds work found nowhere else → his yes.
 - Commits stay local, never rewritten: no amend, no rebase, never `--no-verify`. Commit hook fails → fix the cause if it lies in the run's files; otherwise stop point.
 - Shape he asks for in one message → that reply only. Declared session mode → until he lifts it.
-- Genuinely ambiguous instruction → don't guess, don't stall: lettered options (mid-run: only if it blocks the remaining work).
+- Genuinely ambiguous instruction → don't guess, don't stall: your reading + a yes/no (§3) (mid-run: only if it blocks the remaining work).
 - Safety or security problem outside the scope → flag it first in your next report; never act on it unilaterally (even a good fix outside the spec re-decides his scope). Fixing it → second spec (§8).
