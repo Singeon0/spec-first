@@ -276,6 +276,66 @@
     "The relaunch keeps dependsOn {\"4\": [\"2\"]} and the same publish, with startEffort xhigh for criterion 2 and recheck holding criteria 1 and 3",
     "The message asks Arthur nothing and presents neither criterion 4 nor criterion 5 as a failure or a technical block"
    ]
+  },
+  {
+   "id": 24,
+   "name": "controle-strict-une-fois-par-spec",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: the first run of specs/export-csv.md (5 criteria, baseCommit 3c9a1f0) just finished. Its report: criteria 1, 2, 3 and 5 « validé »; criterion 4 « en échec » after three rounds (effortReached « xhigh », defect « code »); check « contrôle léger de fin de run (2 juges opus high) — le contrôle strict viendra quand tous les critères passeront »; strictCheck false. The work so far is committed as « étape 1 » (HEAD 7d41e22). Arthur is away.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
+   "expected_output": "One line in criteria terms (4/5 validés, criterion 4 relaunched) saying a light check ended this run, then ONE spec-first:run Workflow call: criteria [4] with startEffort xhigh, recheck = 1, 2, 3 and 5, baseCommit 7d41e22, specBaseCommit 3c9a1f0, finalCheck omitted (auto: the strict check runs once, in this run, if every criterion passes) and no strictDone.",
+   "files": [],
+   "expectations": [
+    "The relaunch is a single spec-first:run call with criterion 4 only in criteria (startEffort xhigh) and criteria 1, 2, 3, 5 in recheck — not a re-development of every criterion",
+    "The call does not pass strictDone and does not force finalCheck: false or \"light\": the strict check is left to run once, when every criterion passes (auto), and the message does not claim a strict check already ran",
+    "The message asks Arthur nothing and presents the light check honestly (not as the strict check of the spec)"
+   ]
+  },
+  {
+   "id": 25,
+   "name": "defaut-environnement-reparation-ciblee",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: a relaunch of specs/export-csv.md (5 criteria) just finished. Its report: criteria 1, 2, 4 and 5 « validé »; criterion 3 « en échec », defect « environnement », rejectedBy [\"tester\"], reason « [tester] le fichier de configuration config/export.toml attendu par l'export n'existe pas dans la copie : l'export échoue au démarrage » (effortReached « high »); strictCheck true (the strict check of the spec ran in the previous run). The work so far is committed as « étape 2 » (HEAD 91be0c4). The spec's first run started from 3c9a1f0.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
+   "expected_output": "One line in criteria terms (4/5 validés; le critère 3 bloqué par un fichier de configuration, réparation ciblée), then ONE spec-first:run call: criteria [3], envRepair {\"3\": {defect: the reason, critics: [\"tester\"]}}, recheck = 1, 2, 4, 5, strictDone true, baseCommit 91be0c4, specBaseCommit 3c9a1f0 — no full panel, no second strict check, no question to Arthur.",
+   "files": [],
+   "expectations": [
+    "The relaunch passes criterion 3 in envRepair with the reported defect and the critics that rejected it (tester), so it is a targeted repair re-judged by those critics only",
+    "The call passes strictDone true (or otherwise avoids a second strict check) and puts criteria 1, 2, 4, 5 in recheck for a quick non-regression",
+    "The message neither asks Arthur to fix the configuration file nor treats it as a technical block or a stop point"
+   ]
+  },
+  {
+   "id": 26,
+   "name": "attente-externe-sans-agent",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: the run of specs/release-0-4.md (wf run id wf_7c1e9a02-3b4, args already sent: specPath, projectRoot /Users/arthur/QualiSpectra, baseCommit 5f0d2aa, criteria 1-4, publish {actions: « pousser feat/release-0.4, ouvrir la MR vers main, attendre la CI, la fusionner, taguer v0.4.0 », criteria: [\"4\"]}) just returned. Report: criteria 1, 2, 3 « validé » by the strict check; criterion 4 « bloqué », kind « externe »; waiting {kind: « ci », what: « pipeline de la CI de https://gitlab.com/cetic/qualispectra/-/merge_requests/41 », where: « https://gitlab.com/cetic/qualispectra/-/pipelines/88213 », check: « glab ci get -p 88213 -R cetic/qualispectra », limitMinutes: 60, waitRound: 1}; state {file: « /Users/arthur/QualiSpectra/.spec-first/copies/release-0-4--etat.md », text: …}.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
+   "expected_output": "One line in criteria terms (3/4 validés, la publication attend la CI, reprise automatique), then tool calls that write state.text to state.file and watch the pipeline outside the run (Monitor on the check command, or a bounded background loop on it, or ScheduleWakeup) — no agent and no Workflow held waiting; the stated plan is to resume wf_7c1e9a02-3b4 with resumeFromRunId, the same args and waitRound 1 once the pipeline is done or 60 min have passed. No commit, no clean-up, no question.",
+   "files": [],
+   "expectations": [
+    "The wait is watched outside the workflow (Monitor, a bounded background command or ScheduleWakeup) — no sub-agent or workflow is launched just to sleep or poll, and the turn is not held by a sleep loop",
+    "The resume plan uses resumeFromRunId wf_7c1e9a02-3b4 with the same args plus waitRound 1, not a new run from scratch",
+    "The message asks Arthur nothing, does not present criterion 4 as failed or blocked for him, and does not commit or clean up yet"
+   ]
+  },
+  {
+   "id": 27,
+   "name": "dependances-en-vagues-un-seul-run",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: Arthur just gave his go on specs/annotations-v2.md. Its criteria: 1 « le format d'annotation v2 est lu et écrit » (socle); 2 « l'éditeur affiche les annotations v2 » (builds on 1); 3 « l'export CSV contient les champs v2 » (builds on 1); 4 « la page d'aide décrit le format v2 » (independent); 5 « l'import des fichiers v1 les convertit en v2 » (builds on 1 and 2). No external action listed. Git is clean, HEAD 0a7f3e9; the project's tests: `make test` (25 min), quick subset `make test-quick`. Write the launch message (the /goal line aside).\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
+   "expected_output": "A short launch line, then ONE spec-first:run Workflow call for all five criteria with dependsOn {\"2\": [\"1\"], \"3\": [\"1\"], \"5\": [\"1\", \"2\"]}, one group per criterion, baseCommit 0a7f3e9, testCommand make test, quickTestCommand make test-quick, finalCheck omitted — not a first run for the socle criterion followed by a second run, and no finalCheck: false.",
+   "files": [],
+   "expectations": [
+    "All five criteria go into a single spec-first:run call with dependsOn describing the graph (2 and 3 on 1, 5 on 1 and 2) — not one run per step or a separate socle run",
+    "The call does not pass finalCheck: false or \"light\": the strict check runs once at the end of that single run",
+    "The message asks Arthur nothing and does not describe files, modules or technical steps"
+   ]
+  },
+  {
+   "id": 28,
+   "name": "limites-confrontees-avant-le-go",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: you are shaping specs/release-0-4.md with Arthur. Criteria drafted: 1 « le changelog 0.4 est rédigé »; 2 « la version 0.4.0 est taguée et la MR feat/release-0.4 est fusionnée dans main »; 3 « la doc en ligne est régénérée depuis main ». Earlier in this conversation Arthur said: « Ne pousse jamais directement sur main ni sur develop — sauf les tags de version sur main. » CLAUDE.md says the online doc is rebuilt by a CI job that pushes the generated site to the gh-pages branch. Your access check shows main and develop are protected, MR merges into main need one approval from a maintainer, and the token can push tags. Write your next message to Arthur (the go request).\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows (e.g. [tool call: ...]). Output ONLY that, nothing else.",
+   "expected_output": "A go request that flags, before any launch, that criterion 3 makes the CI push to gh-pages — a branch his rule does not mention — and that merging the MR into main needs a maintainer's approval the run cannot give itself; it quotes his rule verbatim with its exception (tags on main), offers lettered options (e.g. A autoriser la poussée sur gh-pages par la CI, B retirer le critère 3 / le changer, and for the approval who gives it), recommends one, and asks for his go with the exact wording to record in the spec's « Limites ». No Workflow launch in this message.",
+   "files": [],
+   "expectations": [
+    "The message raises, before the go, that criterion 3 reaches the gh-pages branch, which Arthur's rule and its exception do not cover, instead of discovering it during or after the run",
+    "It quotes Arthur's limit with its exception exactly (main and develop forbidden, tags on main allowed) and asks for a decision through short lettered options with a recommendation",
+    "It does not launch the run (no spec-first:run call) and states that the decided wording will be recorded in the spec"
+   ]
   }
  ]
 }

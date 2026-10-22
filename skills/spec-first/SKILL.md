@@ -14,6 +14,7 @@ allowed-tools:
   - Workflow
   - ProposeGoal
   - ScheduleWakeup
+  - Monitor
   - TaskStop
 ---
 
@@ -27,8 +28,9 @@ allowed-tools:
 - Resuming (gap, new session) → first line: what is settled, what is open (settled points erode at session boundaries, not mid-run).
 
 ```
-sources → spec file → accesses checked → clean git → HIS GO (+ the external actions it allows) → /goal line
-  → RUN: spec-first:run, autonomous, you orchestrate (§7)
+sources → spec file → limits + accesses checked → clean git → HIS GO (+ the external actions it allows) → /goal line
+  → RUN: spec-first:run, autonomous, you orchestrate (§7) — one run per spec, dependencies in waves
+      └ external wait (CI, registry, review) → the run stops cleanly, you watch outside, resume it
   → one of three stop points (§4):
       ├ all criteria pass → « spec » commit → clean-up commit → END (§8)
       ├ truly blocked     → lettered question, or a technical block + the one action that lifts it
@@ -41,6 +43,8 @@ Vocabulary, no synonyms:
 - **go** = his explicit approval of the spec
 - **settled** = decided or declared verified by him
 - **critic** = separate agent judging the result, never its author (§7)
+- **strict check** = the full panel (Opus xhigh) judging every criterion on the whole result — once per spec, when all pass (§7)
+- **light check** = what ends every other run: its own changes, a few Opus high judges, a quick non-regression (§7)
 - **run** = his go → one of the three stop points (§4)
 - **end** = last reply of a spec, after the clean-up (§8)
 
@@ -84,10 +88,10 @@ Good: « Le raccourci peut interférer avec la sélection dans un cas rare. A : 
 
 **Before the spec**: read what answers it — CLAUDE.md, earlier specs, tracker, recent commits, recorded decisions. Ask only what they leave open; flag any spec point contradicting a recorded decision.
 
-**Spec file** before any dev work (project's spec location, e.g. `specs/<task>.md`), only: goal (one sentence) · acceptance criteria (observable, checkable on the real result, checklist `- [ ]`) · out of scope.
+**Spec file** before any dev work (project's spec location, e.g. `specs/<task>.md`), only: goal (one sentence) · acceptance criteria (observable, checkable on the real result, checklist `- [ ]`) · out of scope · « Limites »: his prohibitions that bear on it, verbatim, exceptions included (below).
 - nothing else in it: no status line, no « en attente de ton go » · a draft's « Brouillon — pas encore de go » header removed at his go (an agent reading it stops)
 - criteria cut fine: one observable behaviour each; a broad one → sub-criteria (2.1, 2.2) · same scope, finer cut → more of them run at once (§7)
-- what other criteria build on (a shared module, a data format, a common screen) → criteria marked « socle » → run first, on their own (§7)
+- what other criteria build on (a shared module, a data format, a common screen) → criteria marked « socle »; draw the graph — for each criterion, the ones it builds on (`dependsOn`, §7) → one run for the whole spec, in waves, never one run per step
 - something to publish (a release, a merge request merged, a version pinned) → a criterion like any other, checkable from outside (« seglab-hsi 0.13.2 s'installe depuis le registre GitLab »)
 No steps, technical choices or how — he approves an outcome, not a method. Clarify first only what changes the spec, batched as lettered options; never a questionnaire (offloads your thinking onto him).
 
@@ -100,8 +104,13 @@ No steps, technical choices or how — he approves an outcome, not a method. Cla
 - likely secret (`.env`, key, token) not in `.gitignore`, or binary > 10 MB → never committed unasked: A add it to `.gitignore`, B commit it anyway
 - the launch and the run's edits go unasked only in auto/bypass permission mode → another mode known to be on → one line in the go request: each launch will ask for his approval
 
+**Before the go → check every criterion against his limits** — what he forbade: recorded decisions, CLAUDE.md, « ne touche pas à X », « jamais sur main »:
+- each criterion, every way it can be met: the branches, files, sources, services and settings it reaches — all of them, not the first one found
+- impossible without crossing a limit — or an exception he gave covers only part of it (one branch, not the others) → in the go request, the criterion, the limit quoted verbatim and what crosses it, as lettered options (A he lifts it — the exact new wording, exceptions and their reach spelled out —, B the criterion changes, C it leaves the spec); never found at the end of the run
+- his answer → the spec's « Limites », in his exact words with their exceptions: every agent reads it; the owner's advocate checks it
+
 **Before the go → check every access the run will need**, yourself, non-interactively (`GIT_TERMINAL_PROMPT=0`, `ssh -o BatchMode=yes`):
-- each access the criteria need: registry, ssh host, connector, token — rights included (push, open and merge a merge request)
+- each access the criteria need: registry, ssh host, connector, token — rights included (push, open and merge a merge request), and the settings that can refuse them: protected branches and tags, required approvals, merge checks — on every branch the criteria reach
 - remote CI the work goes through: a runner takes its jobs' tags · its last pipeline did not fail for a machine reason (disk full, no runner) · the token can open and merge the merge request
 - missing or broken → in the go request, as lettered options (A he fixes it first, B the run goes without that criterion); never found at the end of the run
 
@@ -115,7 +124,8 @@ No steps, technical choices or how — he approves an outcome, not a method. Cla
 - no approval checkpoints, mid-run questions or how-narration
 - « terminé » only after the critics (separate agents, never the author) check every criterion on the real result
 - tick a criterion in the spec only when the critics pass it
-- fails → the developer sorts the cause (a slip to fix, or an approach to change) and goes one effort tier up (§7); 3 failed rounds → relaunched once, from the effort it reached, together with every other criterion to relaunch (one run, one group each, §7); fails again → stop point, once all the rest is done
+- fails → the developer sorts the cause (a slip to fix, an approach to change, or the environment — a config file, a setting) and goes one effort tier up (§7); 3 failed rounds → relaunched once, from the effort it reached, together with every other criterion to relaunch (one run, one group each, §7); fails again → stop point, once all the rest is done
+- a relaunch re-judges only what changed: the criterion (its own critics) + a quick non-regression of the others — never the whole panel again; broken by its environment only → a targeted repair, re-judged by the critics that rejected it (`envRepair`, §7)
 - unverified → « non vérifié », never presented as done
 
 **Go → stop point: every message carries a tool call** (except the wait line below). A message without one ends your turn and stops the work; the only such message: the stop itself.
@@ -130,6 +140,7 @@ No steps, technical choices or how — he approves an outcome, not a method. Cla
 - a long command of your own (> 2 min: e2e, CI, training) → background, output in a file, short bounded waits (each ≤ 5 min — `timeout`, a loop with a max count — repeated as needed: a shell command is cut at 10 min) · never `pgrep -f` on a pattern (it finds itself), never `sleep` after `sleep` · remote CI → its API, ≥ 60 s between reads, total limit stated
 - watchdog, the one allowed check: `ScheduleWakeup` ≥ 1 h → read the workflow's journal · an agent stuck since the last check → `TaskStop` the workflow, relaunch it with `resumeFromRunId` and the same args (finished agents come back from cache, the stuck one starts again) → one line in criteria terms
 - run interrupted (`TaskStop`, session closed, /compact) → relaunch it at once: `resumeFromRunId` + the same args · run id lost, or args must change → a new run with `integrationBranch` = the integration branch it left (`git branch --list 'spec-first-<specId>--integration-*'`): `recheck` = the criteria of the groups merged into it (one « Merge branch 'spec-first-<specId>--g<N>-…' » per group in its log), `criteria` = the others · never a question
+- external wait — the run returned `waiting` (a pipeline, a registry, a review, a deployment still running): never an agent waiting, never the Workflow held → write `state.text` to `state.file`, then watch it outside the run: `Monitor` on its `check` command, else that command in a background loop (reads ≥ 60 s apart, each wait ≤ 5 min, total limit `limitMinutes`), or `ScheduleWakeup` for a long one (a human review: every hour, no limit) → done, or the limit passed → relaunch it with `resumeFromRunId`, the same args and `waitRound` from the report (finished agents come back from cache) · one line in criteria terms meanwhile (« Run en pause — la CI tourne, reprise automatique. ») · not a stop point, never a question to him · run id lost → a new run with `integrationBranch`, `recheck` = its validated criteria, `strictDone` if its strict check ran
 - never wait hours on an answer from him during a run
 
 **Only three stop points**
@@ -148,7 +159,7 @@ Long run, before each reply → quick re-check: scope unchanged · verdict first
 /goal Tous les critères de specs/<fichier>.md sont cochés, validés par les critiques dans le dernier rapport spec-first de chaque dépôt, et le nettoyage est fait — OU tout le reste est fini et les seuls critères restants attendent ce que seul le propriétaire peut fournir (un appareil, un accès, un changement de spec) ou un blocage technique déjà signalé avec sa cause et l'action qui le lève.
 ```
 
-- no count in it: it stays true when the spec gains or splits a criterion · covers both runs of a two-run spec and the runs of every repository (§7): each repository's last report holds all its criteria
+- no count in it: it stays true when the spec gains or splits a criterion · covers every run of the spec (relaunches, a run paused on an external wait) and the runs of every repository (§7): each repository's last report holds all its criteria
 - a technical block reported once, with its cause and the one action that lifts it = a valid exit: never re-sent, never relaunched as is
 - this spec and this session only: a derived session never reuses it
 - one line before: « Colle cette ligne pour que le run aille au bout sans relance : » · nothing after · under 500 characters
@@ -183,13 +194,14 @@ Good: « Le skill GitLab échoue avec telle erreur. A : je réessaie via le skil
 ## 7. Orchestrate the run
 
 You orchestrate: you neither write nor judge the code — sub-agents do. Your job: cut the work into everything that can run at once, the right model per piece. Every run goes through `spec-first:run` (below), in the background — by hand only in its fallback (end of §7).
-- workflows of your own around it, when the spec calls for it (e.g. codebase-wide research fanned out to Opus medium agents before the developers start) · writing one → load the workflow-authoring skill first · same rules as the run: models, efforts, critics, final check
+- one run per spec whenever possible: the dependency graph (`dependsOn`) puts every step in the same run, in waves — one integration copy, one strict check
+- workflows of your own around it, when the spec calls for it (e.g. codebase-wide research fanned out to Opus medium agents before the developers start) · writing one → load the workflow-authoring skill first · same rules as the run: models, efforts, critics, light and strict checks
 - his « accélère », « reprends », « relance » → arguments of `spec-first:run`: accélère → `maxGroups` raised (a run in progress: `TaskStop`, then `resumeFromRunId` with it — finished agents come back from cache), and for the next run finer `groups`, a `quickTestCommand` · reprends → `resumeFromRunId`, else `integrationBranch` (§4, waiting) · relance → the criteria left, `startEffort`, `recheck`
 
 **Models — Opus only, medium at least** (his decision: every agent gets real work, of uneven difficulty)
 - **Opus medium**: default for real work — developing, analysing, research, aggregating, publishing.
-- **Opus high**: every critic during the run · fusion.
-- **Opus xhigh**: every critic of the final check · the publication tester.
+- **Opus high**: every critic during the run · the light check · fusion.
+- **Opus xhigh**: every critic of the strict check · the publication tester.
 - **Opus high → xhigh**: a developer (or the publisher) after each rejection, one tier up.
 - Never Sonnet, Haiku or Fable · never Opus max (his call alone).
 - Every agent you launch: explicit model + effort (else it takes your session's, max included).
@@ -203,46 +215,53 @@ Opus medium   Opus high
    └─ sort, then one tier up ─┘   developer: medium → high → xhigh
                           only the critics that did not pass judge again, given their own proof
 group done, a criterion passes or can't be checked → merged at once into the integration branch (Opus high, one at a time)
-                                  └ later rework starts from it
-all groups done → final check of every criterion on the whole result (Opus xhigh, wider panel)
+                                  └ later rework and dependent groups start from it
+all groups done ─┬ every criterion of the spec passes, no strict check yet → STRICT CHECK: every criterion, whole result (Opus xhigh, wider panel) — once per spec
+                 └ otherwise → LIGHT CHECK: this run's changes (Opus high, a few judges), earlier criteria by quick non-regression
   └ something broke → one developer repairs (sort + one tier up) → only the critics that rejected judge again
 ```
 
 - **testeur**: runs the real result, tries to break the criterion; visual criteria → checked on screen with the screenshot and browser tools
 - **propriétaire**: checks it does what he meant, not a convenient reading of the words; contradicts none of his decisions
-- **mainteneur**: reads the changes — side effects, scope creep, fragile code; security too, except in the final check
-- final check only, on top: one **testeur** per three criteria (one runs the full test suite) · **intégrateur** (when parts were merged or a run came before): what they broke in each other · **sécurité**: holes the changes introduced (injection, access, secrets)
-- sort after a rejection: a slip → fixed at the root · the approach can't satisfy the criterion, or the same defect came back → another approach, never a second patch
+- **mainteneur**: reads the changes — side effects, scope creep, fragile code; security too, except in the strict check
+- strict check only, on top: one **testeur** per three criteria · **intégrateur** (when parts were merged or a run came before): what they broke in each other · **sécurité**: holes the changes introduced (injection, access, secrets)
+- light check: a **testeur** (this run's criteria on the merged result when groups were combined, the earlier ones by quick non-regression) · an **intégrateur** when groups were combined · one group alone, nothing earlier → none needed
+- tests: one critic per panel runs its suite once (quick during the run and in the light check, full only in the strict check), the others read its log — never the same suite twice on one commit
+- sort after a rejection: a slip → fixed at the root · the approach can't satisfy the criterion, or the same defect came back → another approach, never a second patch · the environment (a config file, a setting, a local file the project expects) → fixed there, no code touched
 - criterion passes = tester verified it on the real result + no critic proved a defect; a defect without a reproduction is not one
 
-**`spec-first:run`** — ready-made: developers, critics, escalation, fusion, final check, publication. Call right after his go (and the « travail en cours » commit, if any), absolute paths, criteria numbered as in the spec:
-`Workflow({name: "spec-first:run", args: {specPath, projectRoot, baseCommit, criteria: [{id, text}], groups, testCommand, quickTestCommand, setupCommand, subdir, maxGroups, dependsOn, exclusive, publish, budget, finalCheck, recheck, startEffort, specBaseCommit, integrationBranch}})`
+**`spec-first:run`** — ready-made: developers, critics, escalation, fusion, light and strict checks, publication. Call right after his go (and the « travail en cours » commit, if any), absolute paths, criteria numbered as in the spec:
+`Workflow({name: "spec-first:run", args: {specPath, projectRoot, baseCommit, criteria: [{id, text}], groups, testCommand, quickTestCommand, setupCommand, subdir, maxGroups, dependsOn, exclusive, publish, budget, finalCheck, strictDone, recheck, startEffort, envRepair, specBaseCommit, integrationBranch, waitRound}})`
 - `projectRoot`: git repository top (§4) · `baseCommit` (required): `git rev-parse HEAD`, right before the call
 - `groups`: every criterion id of this run once · one group per criterion; two share a group only when one can't be checked without the other; ≤ 3 per group · groups may touch the same files: the fusion resolves conflicts · omitted → one group per criterion · every group: its own developer, in its own copy (`.spec-first/copies/<specId>--…`, hidden from git locally) made from the run's integration branch — never in the project itself
-- `testCommand`: the full suite, run from `subdir` (else the repository top) · only in the final check, once, by one tester · omit if none
-- `quickTestCommand`: the fast subset (no e2e, no training) — developers, critics and fusions run it, from `subdir` · pass it whenever the full suite takes minutes · omitted → each runs only the tests covering its criteria
+- `testCommand`: the full suite, run from `subdir` (else the repository top) · only in the strict check, once, by one tester · omit if none
+- `quickTestCommand`: the fast subset (no e2e, no training) — developers, fusions, and one critic per panel (the others read its log), from `subdir` · it is the light check's non-regression · pass it whenever the full suite takes minutes · omitted → each runs only the tests covering its criteria
 - `setupCommand`: makes a fresh copy runnable — dependencies, local config copied from the project, the commit hooks' environment (e.g. `uv sync && cp <root>/.env . && pre-commit install`) · omit if a fresh checkout runs as is
 - commit hooks: always run in the copies, never `--no-verify` · one failing for a cause outside the run's changes → technical block (§4), never a question
 - `subdir`: the project's folder inside the repository (monorepo) · pass it whenever `projectRoot` is not that folder: copies at the repository top, setup and tests from `subdir`
 - `maxGroups`: groups active at once (default 3) — the rest wait, each starts as soon as one finishes · pass it lower when the machine is small or the criteria heavy (training, e2e), higher when he asks to speed up and the machine allows
-- `dependsOn`: `{id: [ids it builds on]}` — the criteria of this run or of `recheck` a criterion needs · its group starts once theirs are merged; they do not pass → it waits, « en attente des dépendances » (below) · pass it whenever a criterion builds on another of the same run (a socle criterion taken again, a relaunch with its dependencies)
+- `dependsOn`: `{id: [ids it builds on]}` — the graph drawn at shaping time (§4), for the whole spec: socle criteria and the ones built on them in the same run · independent groups start at once, a dependent one as soon as what it builds on is merged — waiting holds no slot; they do not pass → it waits, « en attente des dépendances » (below) · pass it whenever a criterion builds on another of the run or of `recheck`
 - `exclusive`: `{"<resource>": [ids of the criteria that need it]}` — a GPU machine, a device, a fixed port, a browser profile · the run lends each to one agent at a time · pass it whenever two criteria would use the same one at once · a plain list → every criterion needs each
-- `publish`: `{actions, criteria}` — the external actions his go authorized (§4), in one readable line, and the ids of the criteria they make true · the CI may start during the run (branch pushed early, if listed); merging, tagging, publishing after the final check, once every other criterion is validated; checked from outside by a fresh tester · omitted → nothing is pushed, published or merged
+- `publish`: `{actions, criteria}` — the external actions his go authorized (§4), in one readable line, and the ids of the criteria they make true · the CI may start during the run (branch pushed early, if listed); merging, tagging, publishing after the strict check, once every other criterion is validated; checked from outside by a fresh tester · no agent ever waits on them: still running → the run returns `waiting` (§4) · omitted → nothing is pushed, published or merged
 - `budget`: output tokens, only when he set a limit → the run stops cleanly before it, partial report
-- `finalCheck: false`, `recheck`: the two-run spec, below · `criteria: []` + `recheck` → the final check alone (« non vérifié », below)
-- `specBaseCommit`: the `baseCommit` of the spec's first run → pass it to every later run of the spec (run 2 of a socle, a relaunch): the final security and maintainer read the whole spec's changes
+- `finalCheck`: omit (`"auto"`) → the strict check when every criterion of the run (`criteria` + `recheck`) passes and none ran before, else the light check · `"strict"` → force it (his request, or the strict check alone, below) · `"light"` → a run that must not end the spec (an earlier run split off on purpose) · `false` → none
+- `strictDone: true`: a report of this spec already said `strictCheck: true` → every later run (a relaunch after the strict check found something): it ends with the light check, never a second strict check
+- `recheck`: the criteria an earlier run of the spec validated — the light check re-checks them by quick non-regression, the strict check judges them again · one an earlier run left « non vérifié » → `unverified: true` on it: judged in full · `criteria: []` + `recheck` + `finalCheck: "strict"` → the strict check alone (below)
+- `specBaseCommit`: the `baseCommit` of the spec's first run → pass it to every later run of the spec (a relaunch): the strict security and maintainer read the whole spec's changes
 - `startEffort`: `{id: effortReached}` from the last report, for a relaunched criterion
+- `envRepair`: `{id: {defect, critics}}` — a criterion the last report gave `defect: "environnement"`: its `reason` as `defect`, its `rejectedBy` as `critics` → a targeted repair of that environment or configuration, judged again only by those critics (the tester always), no full panel
 - `integrationBranch`: resuming an interrupted run without its run id (§4, waiting) — copies start from that branch, its criteria go in `recheck`
+- `waitRound`: resuming after an external wait — the report's `waiting.waitRound`, with `resumeFromRunId` and otherwise the same args (§4)
 
-**Spec with « socle » criteria → two runs in a row, chained alone (the goal covers both)**
+**Criteria that build on others (« socle ») → one run, in waves** (the goal covers it)
 ```
-run 1: socle criteria only, finalCheck: false → result squashed + commit « spec : <nom> (socle) »
-run 2: the other criteria, baseCommit = that commit, specBaseCommit = run 1's baseCommit, recheck = the socle criteria (id, text)
-       → its final check judges every criterion of the spec (security and maintainer read from specBaseCommit) → one report for both runs
+one run: every criterion, dependsOn = the graph → socle groups and independent ones start at once
+         → a dependent group starts as soon as what it builds on is merged → one integration copy
+         → every criterion passes → one strict check → one report
 ```
-- one rule: never two runs at once on the same repository — run 2 starts once run 1 is back and committed
-- run 1 leaves a socle criterion failed or blocked → run 2 takes it again (its own group, in a copy like every group, `startEffort`) with all the others, `dependsOn` for those that build on it: they start once it is merged, or come back « en attente des dépendances »
-- the last reply merges both runs: decisions, findings outside the spec, copies of both
+- never two runs at once on the same repository
+- a socle criterion fails → the criteria built on it come back « en attente des dépendances » → relaunched with it (below)
+- runs chained on purpose anyway (a step that must happen between them, outside any run) → each earlier one `finalCheck: "light"`, its result committed « étape N » (the next `baseCommit`); the last one carries the strict check (`recheck` = all the earlier criteria)
 
 **Several repositories → one run each** (a run never spans two; a sub-project with its own `.git` is one)
 - independent → launched together: two Workflow calls in the same message
@@ -251,21 +270,25 @@ run 2: the other criteria, baseCommit = that commit, specBaseCommit = run 1's ba
 
 **Result** (`result` in the report): `in: "project"` → already in the working tree · `in: "integration"` → on `result.branch`: `git -C <root> merge --squash <branch>`, then the « spec » commit (§8)
 - `publication` (`done`, `steps`, `reason`) and `ci` (`branch` pushed, `mergeRequest` = the request's link, `unavailable`) → what left the machine, said in the last reply
+- `check` → which check ended the run, said in plain words in your report (« contrôle léger » or « contrôle strict »); `strictCheck: true` → pass `strictDone: true` to every later run of the spec
+- `state` → each time the run returns, write `state.text` to `state.file` (`.spec-first/copies/<specId>--etat.md`): step, criteria, waits — readable by him or a later session
 - another run in the same spec (a relaunch, a changed spec) → first commit the work so far, spec file aside, in one local commit « spec : <nom> (étape N) »; that commit = its `baseCommit` (copies start from it)
 
 It runs in the background → wait (§4) until it returns. It returns `{error}` → first fix the args it names and relaunch it, in the same turn — never a question: `{error}` is a wrong argument, not a failing Workflow. Then:
-- « validé » → tick it in the spec, add « Décisions prises pendant le run » → clean up and end (§8)
-- « non vérifié » → never « terminé », never judged by a lone Agent call: a critic did not return (« aucun verdict de … »), or the final check did not judge it → `recheck` of the next run (with the criteria to relaunch, if any) · nothing to relaunch → a run with `criteria: []`, `recheck` = them + the other validated criteria: the final check alone, its report holds every criterion · something only he can provide is missing (a device, a credential) → stop point « truly blocked » (§4)
+- « validé » → tick it in the spec · every criterion validated and `strictCheck: true` → add « Décisions prises pendant le run » → clean up and end (§8)
+- `waiting` → an external wait, not a result (its criteria « bloqué », `kind: "externe"`): nothing committed, nothing cleaned; watch it and resume (§4, waiting)
+- `strictPending: true` → every criterion passes but no strict check ever ran → a run with `criteria: []`, `recheck` = every criterion, `finalCheck: "strict"`: the strict check alone, its report holds every criterion
+- « non vérifié » → never « terminé », never judged by a lone Agent call: a critic did not return (« aucun verdict de … »), or the check did not judge it → `recheck` of the next run with `unverified: true` (`{id, text, unverified: true}`: judged in full, never only for non-regression), with the criteria to relaunch, if any · nothing to relaunch → a run with `criteria: []`, `recheck` = them + the other validated criteria (`finalCheck: "strict"` if no strict check ran yet): its report holds every criterion · something only he can provide is missing (a device, a credential) → stop point « truly blocked » (§4)
 - « bloqué » by a blocker that is only the how (nothing for him to decide) → decide it, log it under « Décisions prises pendant le run », relaunch it with the others to relaunch
 - « en attente des dépendances » (« bloqué », `kind: "attente"`) — held only because criteria it depends on (`waitingFor`) did not pass: not a failure of its own, not a technical block → relaunched as is in the next relaunch, together with those criteria — in `relaunchAs` (`recheck` when its own work already passed, `criteria` otherwise), with the same `dependsOn` · a publication criterion is one case: it depends on every other criterion; the same `publish` · what it waits for reaches a stop point → it waits there with it, listed with it
-- « en échec » after three rounds → commit the work so far (« étape N »), relaunch it, `startEffort` = its `effortReached`, once
-- every criterion to relaunch → one run, all together, one group each, never one run per criterion · `recheck` = every other criterion of the spec already validated: its final check judges them all on the new code, its report holds every criterion (the goal)
+- « en échec » after three rounds → commit the work so far (« étape N »), relaunch it, `startEffort` = its `effortReached`, once · `defect: "environnement"` (its critics proved the environment or configuration wrong, not the code) → relaunched in `envRepair` instead: a targeted repair, re-judged by its `rejectedBy` only
+- every criterion to relaunch → one run, all together, one group each, never one run per criterion · `recheck` = every other criterion of the spec already validated, `specBaseCommit`, `strictDone` if a strict check ran: the relaunched criteria get their own critics, the others a quick non-regression in the light check — or the strict check, if this is the first time every criterion passes · its report holds every criterion (the goal)
 - technical block → never relaunched as is, no lettered question: stop point with its cause and the one action that lifts it (§4) — « bloqué » with `kind: "technique"` (CI unavailable, a machine down, a copy impossible, a hook failing outside the run's changes), « en panne » (`crashed`: an agent that did not answer, even after the run's own retry), work not merged (« Non intégré » — its branch kept: `copies` with `integrated: false`)
 - « en échec » again, or « bloqué » with `kind: "question"` (a blocker that needs him) → stop point (§4), once the rest is done: the gap in his terms, options, your recommendation
 - found beyond the spec (task wider than planned, neighbouring problem) → never added to this run → second spec (§8)
 
 One-sentence spec (small reversible task, §4) → no workflow: one Opus medium sub-agent does it, one Opus high tester checks it.
-Workflow tool unavailable or failing → same roles via the Agent tool, under the same rules: same models and efforts, the three critics launched in one message, escalation, fusion, the final check of every criterion.
+Workflow tool unavailable or failing → same roles via the Agent tool, under the same rules: same models and efforts, the three critics launched in one message, escalation, fusion, dependencies in waves, a light check ending each run and the strict check of every criterion once per spec, external waits watched by you, never by an agent.
 
 ## 8. The end: clean up, say it's done, stop
 
@@ -275,11 +298,11 @@ A spec ends: every criterion passes — or he accepts the result as is → this 
 criteria pass → commit « spec : <nom> » → clean-up sub-agent → commit « nettoyage : <nom> » → last reply → stop
 ```
 
-**Commit, then clean up, still inside the run** — local commits on the current branch, yours, never his (with « étape N » or socle commits before them):
+**Commit, then clean up, still inside the run** — local commits on the current branch, yours, never his (with « étape N » commits before them):
 1. « spec : <nom> »: the result (`merge --squash` of `result.branch` when `in: "integration"`, §7) + the ticked spec; you make it.
    - the publication merged the result into a remote branch (`publication.done`, its `steps` show the merge request merged — `ci.mergeRequest` is its link) → no squash: bring his branch to it (`git pull --ff-only`), then the ticked spec alone in the commit · fast-forward impossible → stop point, never a force · the pushed branch stays on the remote unless his go listed its removal
 2. « nettoyage : <nom> »: one Opus medium sub-agent, given the project root, the spec, the « spec » commit, the `copies` of every run of this spec, the files this conversation created. Job: repository as clean as if done in one go, in a commit that can be undone on its own:
-   - unasked: the `copies` with `integrated: true` of every run of this spec — its integration copies (`group: "intégration"`, once squashed; merged group copies are already gone) —, every orphan copy or branch of this spec (named after `specId` in the report: `spec-first-<specId>--…`, `.spec-first/copies/<specId>--…`; left by an interrupted run, in no report) and its logs (`.spec-first/logs/<specId>-*`) — `git worktree remove --force`, `git branch -D`, then the empty folder
+   - unasked: the `copies` with `integrated: true` of every run of this spec — its integration copies (`group: "intégration"`, once squashed; merged group copies are already gone) —, every orphan copy or branch of this spec (named after `specId` in the report: `spec-first-<specId>--…`, `.spec-first/copies/<specId>--…`; left by an interrupted run, in no report), its state file (`.spec-first/copies/<specId>--etat.md`) and its logs (`.spec-first/logs/<specId>-*`) — `git worktree remove --force`, `git branch -D`, then the empty folder
    - delete the temporary files, probes, logs and scratch files this conversation created
    - remove what the merged change made useless: dead code, replaced files, scripts and docs about behaviour that no longer exists
    - run the project tests afterwards; put back any removal that breaks them
