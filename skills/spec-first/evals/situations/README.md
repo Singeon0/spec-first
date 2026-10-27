@@ -7,6 +7,7 @@ Ce banc vérifie, à chaque version du plugin, qu'un orchestrateur qui lit SKILL
 - `preambule.md` : le début de consigne, commun à toutes les situations.
 - `NN-*.md` : une situation par fichier — la consigne, le contexte fourni, les points vérifiables (A1, A2…), les erreurs typiques et, pour la 1.7.0, les lignes du SKILL concernées.
 - `resultats-1.7.0.md` : les notes de la 1.7.0, point de départ des comparaisons.
+- `resultats-1.8.0.md` : les notes de la 1.8.0 (27 situations).
 
 ## Relancer le banc
 1. Mettre la version à tester dans un dossier à part, sans `skills/spec-first/evals/` (les agents ne doivent pas voir les réponses attendues), par exemple : `mkdir /tmp/sf-X && git archive <commit> | tar -x -C /tmp/sf-X --exclude=skills/spec-first/evals`.

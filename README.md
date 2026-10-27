@@ -115,13 +115,13 @@ Its arguments, and when the orchestrator passes them:
 | `exclusive` | a resource two criteria would use at once (a GPU machine, a device, a fixed port), with the criteria that need it: the run lends it to one agent at a time |
 | `publish` | the external actions the owner's go authorized, and the criteria they make true |
 | `profil` | `"rapide"` when the owner's go chose it, with `simples` (the criteria Haiku takes); omitted → `"standard"` |
-| `budget` | when the owner set a token limit: the run stops cleanly before it — as it does after three agents in a row die (a usage limit, an API outage); its `resume` says how to go on: the same run id with the exact same args, or its integration branch |
-| `finalCheck` | omitted: the strict check when every criterion passes and none ran before, the light check otherwise; `"strict"` or `"light"` force one, `false` none |
+| `budget` | when the owner set a token limit: the run stops cleanly before it — as it does after three agents in a row die (a usage limit, an API outage); its `resume` says how to go on: the same run id with the exact same args (only `budget` and `maxGroups` may change), or its integration branch |
+| `finalCheck` | omitted: the strict check when every criterion passes and no strict check of the spec ran before (no `strictDone`), the light check otherwise; `"strict"` or `"light"` force one, `false` none |
 | `strictDone` | a strict check of this spec already ran: later runs end with the light check |
 | `recheck` | criteria an earlier run validated: re-checked by non-regression in the light check, judged again in the strict check; a « non vérifié » one carries `unverified: true` and is judged in full; with `criteria: []` and `finalCheck: "strict"`, the strict check alone |
 | `startEffort` | a relaunched criterion resumes from the effort it reached |
 | `envRepair` | a criterion broken by its environment or configuration: a targeted repair, re-judged by the critics that rejected it |
-| `rejectedBy` | a criterion relaunched after « en échec »: only the critics that rejected it judge it again |
+| `rejectedBy` | a criterion relaunched after « en échec »: only the critics that rejected it judge it again; `{ critics, proof }` passes them a fact (the spec sentence a rejection contradicts, or the flaw the strict check found); security and integrator are played by the maintainer during the run |
 | `specBaseCommit` | every later run of a spec (a relaunch): the strict security and maintainer read the whole spec's changes |
 | `integrationBranch` | resuming an interrupted run whose run id is lost: the new run starts from the branch it left |
 | `waitRound` | resuming a run that stopped on an external wait (CI, registry, review) |
@@ -153,7 +153,7 @@ Merging, tagging and publishing run after the strict check, once every
 other criterion is validated; a fresh tester checks them from outside.
 When they go through a remote CI, its pipeline starts as soon as the
 first group they depend on is merged, and its result counts in the
-check. No agent ever waits for something outside the machine (a
+check — in the « rapide » profile, only once, at the publication. No agent ever waits for something outside the machine (a
 pipeline, a registry, a review, a deployment): the run stops cleanly
 with what it waits for, where to look and the command that tells it is
 done; Claude watches it outside the run and resumes the run where it
