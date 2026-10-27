@@ -48,3 +48,16 @@ Total : 195,5 / 221 (88 %). Premières réponses seules : 171,5 / 192 (89 %). Su
 - Contrôle strict refait après une faille : 2 sur 2 (17, 17b). L'agent suit L266, qui contredit D4 et la grille de la 17 ; la consigne de la 17 annonce aussi `strictCheck: true` avec un critère en échec, ce que run.js ne produit plus. À trancher par Arthur.
 - Commit « étape N » sans squash : 2 sur 2 (12, 12b), avant la correction de L294.
 - Réparation d'environnement au lieu de corriger `setupCommand` : 06, comme en 1.7.0.
+
+## Reprise de la situation 17 — un seul contrôle strict par spec (décision D4)
+
+Correctif : `strictCheck: true` dès que le contrôle strict a tourné sur toute la spec, même s'il refuse un critère. Ce critère est relancé avec `rejectedBy {critics, proof}` ; le juge du contrôle strict qui l'a refusé (sécurité, intégrateur) revient lui-même, au niveau xhigh, avec le testeur. Le run se termine par le contrôle léger (run.js, SKILL `strictDone` / `rejectedBy`, grille A4 mise à jour).
+
+Mesuré par simulation (agents fictifs) : strict qui trouve une faille → `strictCheck: true` ; la relance appelle testeur (high) + sécurité (xhigh), puis le contrôle léger ; aucun deuxième contrôle strict. Même chose en profil rapide (Sonnet).
+
+| Agent | Score | Manqué |
+|---|---|---|
+| A (opus-medium) | 6,5 / 7 | A6 : question oui/non suivie d'une option de repli (« Sinon, je relance ») |
+| B (opus-medium) | 7 / 7 | — |
+
+Avant : 3 / 7 puis 3,5 / 7. Ambiguïtés relevées par les agents et corrigées dans le SKILL : la relance après un refus du contrôle strict est une relance à part entière ; un run avec `strictDone` rapporte `strictCheck: true` ; un critère refusé est décoché ; le rapport dit « contrôle léger » et nomme le juge qui a rejugé au niveau strict.

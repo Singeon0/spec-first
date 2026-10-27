@@ -117,11 +117,11 @@ Its arguments, and when the orchestrator passes them:
 | `profil` | `"rapide"` when the owner's go chose it, with `simples` (the criteria Haiku takes); omitted → `"standard"` |
 | `budget` | when the owner set a token limit: the run stops cleanly before it — as it does after three agents in a row die (a usage limit, an API outage); its `resume` says how to go on: the same run id with the exact same args (only `budget` and `maxGroups` may change), or its integration branch |
 | `finalCheck` | omitted: the strict check when every criterion passes and no strict check of the spec ran before (no `strictDone`), the light check otherwise; `"strict"` or `"light"` force one, `false` none |
-| `strictDone` | a strict check of this spec already ran: later runs end with the light check |
+| `strictDone` | a strict check of this spec already ran — even one that rejected a criterion: later runs end with the light check, the rejected criterion re-judged by the judges that rejected it |
 | `recheck` | criteria an earlier run validated: re-checked by non-regression in the light check, judged again in the strict check; a « non vérifié » one carries `unverified: true` and is judged in full; with `criteria: []` and `finalCheck: "strict"`, the strict check alone |
 | `startEffort` | a relaunched criterion resumes from the effort it reached |
 | `envRepair` | a criterion broken by its environment or configuration: a targeted repair, re-judged by the critics that rejected it |
-| `rejectedBy` | a criterion relaunched after « en échec »: only the critics that rejected it judge it again; `{ critics, proof }` passes them a fact (the spec sentence a rejection contradicts, or the flaw the strict check found); security and integrator are played by the maintainer during the run |
+| `rejectedBy` | a criterion relaunched after « en échec »: only the critics that rejected it judge it again; `{ critics, proof }` passes them a fact (the spec sentence a rejection contradicts, or the flaw the strict check found); a strict-check judge (security, integrator) that rejected it comes back itself, at the strict level |
 | `specBaseCommit` | every later run of a spec (a relaunch): the strict security and maintainer read the whole spec's changes |
 | `integrationBranch` | resuming an interrupted run whose run id is lost: the new run starts from the branch it left |
 | `waitRound` | resuming a run that stopped on an external wait (CI, registry, review) |

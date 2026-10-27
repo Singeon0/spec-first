@@ -34,6 +34,7 @@ const HELPER = { model: RAPIDE ? 'haiku' : 'opus', effort: 'medium' } // plumbin
 const TESTER_SHARE = 3 // criteria per tester in the strict and light checks
 const CI_WAIT_MIN = 60 // longest wait for one remote pipeline, in minutes — watched by the orchestrator, never by an agent
 const IN_RUN = ['tester', 'owner', 'maintainer'] // the three critics of every group
+const STRICT_ONLY = ['security', 'integrator'] // judges of the strict check only — or of the relaunch of a criterion they rejected
 const personaOf = key => String(key).split('-')[0]
 
 // ---------------------------------------------------------------- args
@@ -233,12 +234,14 @@ const PRIOR = {}
 if (input.rejectedBy != null) {
   if (typeof input.rejectedBy !== 'object' || Array.isArray(input.rejectedBy)) log('rejectedBy ignoré : ce doit être { id: [critiques] }.')
   else {
-    const asCritic = k => ({ ci: 'tester', integrator: 'maintainer', security: 'maintainer' })[personaOf(String(k))] || personaOf(String(k))
+    // A strict-check judge (security, integrator) that rejected it judges it again itself, at the
+    // strict check's level: the strict check runs once per spec, never a second time for one flaw.
+    const asCritic = k => ({ ci: 'tester' })[personaOf(String(k))] || personaOf(String(k))
     for (const [id, v] of Object.entries(input.rejectedBy)) {
       const o = Array.isArray(v) ? { critics: v } : (v && typeof v === 'object' ? v : {})
       if (!critIds.includes(id)) { log(`rejectedBy ignoré pour « ${id} » : ${byId[id] ? 'critère de recheck, pas développé ici' : 'critère inconnu'}.`); continue }
       if (ENV[id]) continue
-      const critics = [...new Set(['tester', ...(Array.isArray(o.critics) ? o.critics : []).map(asCritic).filter(k => IN_RUN.includes(k))])]
+      const critics = [...new Set(['tester', ...(Array.isArray(o.critics) ? o.critics : []).map(asCritic).filter(k => IN_RUN.includes(k) || STRICT_ONLY.includes(k))])]
       PRIOR[id] = { critics, proof: String(o.proof || o.reason || 'rejeté par le run précédent').trim() }
     }
   }
@@ -302,7 +305,7 @@ const groupNeeds = GROUPS.map((g, i) => [...new Set(g.criteria.flatMap(c => (DEP
 // Offset by the project: two runs at once on two repositories do not collide.
 const hashOf = s => { let h = 2166136261; for (const ch of String(s)) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619) >>> 0 } return h }
 const PORT_BASE = (hashOf(ROOT) % 9) * 500
-const groupSlot = (gid, k) => 16 * Number(gid) + k // k: 0-2 developer round, 3-11 critics (3 per round), 12 fusion
+const groupSlot = (gid, k) => 16 * Number(gid) + k // k: 0-2 developer round, 3-11 critics (3 per round), 12 fusion, 13-14 a strict judge back for a relaunch
 const FINAL_SLOT = 16 * (GROUPS.length + 1) // the check ending the run: one per critic, then 90+ the repair
 const PUB_SLOT = FINAL_SLOT + 100 // publication: 0-2 the publisher, 5 its tester
 const portsFor = slot => { const a = 20000 + 10 * ((PORT_BASE + slot) % 4500); return `${a}-${a + 9}` }
@@ -932,7 +935,12 @@ Your criteria build on criteria ${needs.join(', ')}, done elsewhere: they are al
   const defs = Object.fromEntries(IN_RUN.map(k => [k, seatDef(k)]))
   // A targeted repair (envRepair, a group of its own): only the critics that rejected it judge it.
   const env = ids.length === 1 && ENV[ids[0]] ? ENV[ids[0]] : null
-  const KEYS = env ? env.critics : IN_RUN
+  // A relaunch of criteria a strict-check judge rejected: that judge comes back, at its strict level.
+  const priorAll = ids.every(id => PRIOR[id])
+  const extra = env || !priorAll ? [] : [...new Set(ids.flatMap(id => PRIOR[id].critics.filter(k => STRICT_ONLY.includes(k))))]
+  for (const k of extra) defs[k] = seatDef(k, { final: true })
+  const KEYS = env ? env.critics : [...IN_RUN, ...extra]
+  const slotOf = (k, round) => IN_RUN.includes(k) ? 3 + 3 * round + IN_RUN.indexOf(k) : 13 + STRICT_ONLY.indexOf(k)
   if (env) log(`${tag} : réparation ciblée du critère ${ids[0]} (défaut d'environnement) — rejugé par : ${KEYS.map(k => defs[k].label).join(', ')}`)
   const start = Math.max(0, ...ids.map(id => DEV_EFFORTS.indexOf(START[id] || DEV_EFFORTS[0])))
   // Every group starts from the integration branch: what is already merged.
@@ -1047,7 +1055,7 @@ ${COMMON_RULES}`
           break
         }
       }
-      if (RAPIDE) {
+      if (RAPIDE && !priorAll) {
         // « rapide »: no critics during the run. A criterion the developer's self-check passes goes on to
         // the check that ends the run; one it does not pass gets a new round one tier up, with his own
         // evidence as feedback.
@@ -1091,7 +1099,7 @@ ${changesHint(where)}${mergedIn ? ' Work merged into this copy before (other gro
         ? KEYS.map(k => ({ ...defs[k], criteria: pending, ...(env ? { previous: pending.map(c => [c.id, { verdict: 'defect', proof: env.defect }]) } : {}) }))
         : recheckSeats(pending, book, () => KEYS, defs)
       // One critic runs the quick suite for the panel, the others read its log.
-      const seats = withSuite(panel.map(s => ({ ...s, slot: groupSlot(g.id, 3 + 3 * round + IN_RUN.indexOf(s.key)) })), quickTestCommand, suitePath(`g${g.id}-r${round + 1}`))
+      const seats = withSuite(panel.map(s => ({ ...s, slot: groupSlot(g.id, slotOf(s.key, round)) })), quickTestCommand, suitePath(`g${g.id}-r${round + 1}`))
       await judgeSeats(seats, book, where, context, 'Critique', `${tag} — critique essai ${round + 1}`)
       const rejected = []
       const leads = []
@@ -1883,7 +1891,10 @@ return {
   check: checkLine,
   // Done only when it validated the whole spec: a criterion it left failed or « non vérifié » → the
   // spec's strict check is still to come, on the run that completes it.
-  strictCheck: STRICT_DONE || (STRICT_RAN && counts.total > 0 && counts.validated === counts.total),
+  // Once per spec: the strict check ran on the whole spec → done, even when it rejected a criterion.
+  // That criterion is relaunched and re-judged by the judges that rejected it (rejectedBy), never by a
+  // second full strict check.
+  strictCheck: STRICT_DONE || (STRICT_RAN && counts.total > 0),
   strictPending,
   waiting: waitingOut,
   state: { file: `${ROOT}/${COPIES}/${SPEC_ID}--etat.md`, text: stateText },
