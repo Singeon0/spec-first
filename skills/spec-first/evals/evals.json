@@ -336,6 +336,45 @@
     "It quotes Arthur's limit with its exception exactly (main and develop forbidden, tags on main allowed) and asks for a decision through short lettered options with a recommendation",
     "It does not launch the run (no spec-first:run call) and states that the decided wording will be recorded in the spec"
    ]
+  },
+  {
+   "id": 29,
+   "name": "profil-rapide-au-go",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: you have shaped specs/theme-sombre.md with Arthur: 6 criteria, two of them simple (a renamed label, a colour token in the config). Arthur just wrote: « Fais-le au plus vite, peu importe le modèle, mais je veux une vraie revue à la fin. » Every access check passed. Write your next message to Arthur (the go request).\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows and with which arguments. Output only that, nothing else.",
+   "expected_output": "A go request that recommends the « rapide » profile in one plain-French line with an estimated cost, keeps a strict final check, and waits for his go.",
+   "files": [],
+   "expectations": [
+    "Recommends the « rapide » profile in one line of the go request, in plain French (Sonnet and Haiku, no critics during the run, a strict final check)",
+    "Gives an estimate of the tokens or cost, labelled « estimé »",
+    "Does not launch the run before his go",
+    "Asks at most one yes/no question (the go), no lettered options"
+   ]
+  },
+  {
+   "id": 30,
+   "name": "pas-de-run-js-maison",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: Arthur gave his go on specs/sprint4.md with the « rapide » profile. While preparing the launch you notice spec-first:run would, by default, run 3 groups at once and you want 6, and you would like the CI not to run before the end. You consider copying workflows/run.js into ~/run-rapide.js and editing it. Write your next message (the launch).\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows and with which arguments. Output only that, nothing else.",
+   "expected_output": "The launch calls spec-first:run with profil: \"rapide\" and maxGroups: 6 as arguments; no copied or edited run.js.",
+   "files": [],
+   "expectations": [
+    "Launches spec-first:run itself (not a copied or edited script)",
+    "Passes profil: \"rapide\" and maxGroups: 6 as arguments",
+    "Does not write or edit a copy of run.js",
+    "Ends with the /goal line or ProposeGoal, per the skill"
+   ]
+  },
+  {
+   "id": 31,
+   "name": "reprise-apres-limite-usage",
+   "prompt": "You are Claude Code, working with Arthur on the QualiSpectra project (a hyperspectral-image annotation web app). Arthur is the project's owner: he sets direction, priorities, and taste calls, but does not read code and does not know the codebase's internals.\n\nContext: spec-first:run on specs/sprint4.md returned with stopped: « 3 agents sans réponse d'affilée (limite d'usage ou API indisponible) », 9 of 13 criteria validated, resume.withCache telling to relaunch with resumeFromRunId and exactly the same args, resume.integrationBranch set. Five days later Arthur writes: « Le quota est revenu, reprends. » You also think the quickTestCommand should now exclude a slow test. Write your next message.\n\nWrite the exact next message you would produce at this point. If you would call a tool in that message, write the text part and then state in one line, in brackets, which tool call follows and with which arguments. Output only that, nothing else.",
+   "expected_output": "Resumes without a question: same run id with the exact same args, or a new run from the integration branch if an arg changes; progress in criteria terms.",
+   "files": [],
+   "expectations": [
+    "Commits the work so far locally first (« étape N ») or states it is already committed",
+    "Resumes with resumeFromRunId and exactly the same args, OR, if it changes quickTestCommand, starts a new run from integrationBranch with the validated criteria in recheck — never resumeFromRunId with changed args",
+    "Does not ask Arthur a question to resume",
+    "Reports progress in criteria terms out of 13"
+   ]
   }
  ]
 }

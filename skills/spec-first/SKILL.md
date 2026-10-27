@@ -117,6 +117,10 @@ No steps, technical choices or how — he approves an outcome, not a method. Cla
 - missing or broken → in the go request: what is missing and the one action that fixes it; never found at the end of the run
 - the run never waits on it: his go launches the run at once; criteria that need the missing access wait in `waitingFor` (§7) and are relaunched when it is fixed; everything else, and every external action not yet confirmed, goes on — nothing published until confirmed; a night is never lost waiting on one answer
 
+**Before the go → the profile, his choice** (`profil`, §7): « standard » (default) or « rapide » — never chosen for him, never switched mid-spec without his yes.
+- go request: one line with the profile and its cost in plain words — « profil standard : Opus, trois critiques par groupe » or « profil rapide : Sonnet et Haiku, aucune critique pendant le run, contrôle final strict » — and an estimate of the tokens (« estimé »), from the spec's size: a usage limit stops a run as surely as a bug
+- he asks for speed (« au plus vite », « mode rapide ») → recommend « rapide » in that line; his go accepts it
+
 **Go** = his go on this spec. Not a go: an earlier session's go, an ambiguous « ok » (false go → work he didn't choose). Small reversible task → one-sentence spec inline, zero questions.
 - the go request lists, in one readable line, every external action the run will take — e.g. « publier seglab-hsi 0.13.2 sur le registre GitLab », « pousser la branche feat/x, ouvrir la MR vers main, attendre la CI, la fusionner, taguer » → his go authorizes those, only those (`publish`, §7)
 - a push during the run counts: the branch pushed early so the CI runs alongside → in that line too (« pousser la branche dès le premier groupe fusionné, pour lancer la CI »)
@@ -145,6 +149,7 @@ No steps, technical choices or how — he approves an outcome, not a method. Cla
 - run interrupted (`TaskStop`, session closed, /compact) → relaunch it at once: `resumeFromRunId` + the same args · run id lost, or args must change → a new run with `integrationBranch` = the integration branch it left (`git branch --list 'spec-first-<specId>--integration-*'`): `recheck` = the criteria of the groups merged into it (one « Merge branch 'spec-first-<specId>--g<N>-…' » per group in its log), `criteria` = the others · never a question
 - external wait — the run returned `waiting` (a pipeline, a registry, a review, a deployment still running): never an agent waiting, never the Workflow held → write `state.text` to `state.file`, then watch it outside the run: `Monitor` on its `check` command, else that command in a background loop (reads ≥ 60 s apart, each wait ≤ 5 min, total limit `limitMinutes`), or `ScheduleWakeup` for a long one (a human review: every hour, no limit) → done, or the limit passed → relaunch it with `resumeFromRunId`, the same args and `waitRound` from the report (finished agents come back from cache) · one line in criteria terms meanwhile (« Run en pause — la CI tourne, reprise automatique. ») · not a stop point, never a question to him · run id lost → a new run with `integrationBranch`, `recheck` = its validated criteria, `strictDone` if its strict check ran
 - never wait hours on an answer from him during a run
+- an unattended run must never stop on a permission prompt: your own clean-up uses fixed paths you created (never `rm` with `$(…)`, never /tmp wiped mid-run); a command that needs his approval waits for a moment he is there, after the run
 
 **Only three stop points**
 - **all criteria pass** → clean up → end (§8)
@@ -199,15 +204,23 @@ Good: « Le skill GitLab échoue avec telle erreur. Je recommande de réessayer 
 You orchestrate: you neither write nor judge the code — sub-agents do. Your job: cut the work into everything that can run at once, the right model per piece. Every run goes through `spec-first:run` (below), in the background — by hand only in its fallback (end of §7).
 - one run per spec whenever possible: the dependency graph (`dependsOn`) puts every step in the same run, in waves — one integration copy, one strict check
 - workflows of your own around it, when the spec calls for it (e.g. codebase-wide research fanned out to Opus medium agents before the developers start) · writing one → load the workflow-authoring skill first · same rules as the run: models, efforts, critics, light and strict checks
+- never write your own copy of `run.js` (a « run-rapide.js »): what you would change is an argument — `profil`, `maxGroups`, `finalCheck`, `groups`; a need no argument covers → say it in your report, the plugin lacks it
 - his « accélère », « reprends », « relance » → arguments of `spec-first:run`: accélère → `maxGroups` raised (a run in progress: `TaskStop`, then `resumeFromRunId` with it — finished agents come back from cache), and for the next run finer `groups`, a `quickTestCommand` · reprends → `resumeFromRunId`, else `integrationBranch` (§4, waiting) · relance → the criteria left, `startEffort`, `recheck`
 
-**Models — Opus only, medium at least** (his decision: every agent gets real work, of uneven difficulty)
+**Models — profile « standard » (default): Opus only, medium at least** (his decision: every agent gets real work, of uneven difficulty)
 - **Opus medium**: default for real work — developing, analysing, research, aggregating, publishing.
 - **Opus high**: every critic during the run · the light check · fusion.
 - **Opus xhigh**: every critic of the strict check · the publication tester.
 - **Opus high → xhigh**: a developer (or the publisher) after each rejection, one tier up.
 - Never Sonnet, Haiku or Fable · never Opus max (his call alone).
 - Every agent you launch: explicit model + effort (else it takes your session's, max included).
+
+**Profile « rapide » — only when his go chose it** (`profil: "rapide"`, §4): the same engine, lighter
+- **Sonnet** medium → high → xhigh: developers, repairs, publication, fusion · **Haiku**: the criteria you mark `simples` at shaping time (renaming, wording, configuration, a one-file change) and the plumbing (CI reads, tidying) — never a fusion, a repair or a judge
+- no critics during the run: a criterion the developer's self-check passes goes on; one it does not → a new round one tier up
+- the check that ends the run always runs (never `finalCheck: false`), Sonnet judges: the strict check (xhigh, full panel) once every criterion passes, else the light check judging every criterion of the run
+- CI and e2e: once, at the end (`testCommand` in the strict check, `publish` after it) · `quickTestCommand` for the developers
+- everything else unchanged: copies, waves, fusion, publication only as authorized, the stop points, the goal
 
 **Judging — same in every workflow, ready-made or yours, and in the fallback** (one exception: the one-sentence spec, below)
 
@@ -234,19 +247,20 @@ all groups done ─┬ every criterion of the spec passes, no strict check yet �
 - criterion passes = tester verified it on the real result + no critic proved a defect; a defect without a reproduction is not one
 
 **`spec-first:run`** — ready-made: developers, critics, escalation, fusion, light and strict checks, publication. Call right after his go (and the « travail en cours » commit, if any), absolute paths, criteria numbered as in the spec:
-`Workflow({name: "spec-first:run", args: {specPath, projectRoot, baseCommit, criteria: [{id, text}], groups, testCommand, quickTestCommand, setupCommand, subdir, maxGroups, dependsOn, exclusive, publish, budget, finalCheck, specTotal, strictDone, recheck, startEffort, envRepair, rejectedBy, specBaseCommit, integrationBranch, waitRound}})`
+`Workflow({name: "spec-first:run", args: {specPath, projectRoot, baseCommit, criteria: [{id, text}], groups, testCommand, quickTestCommand, setupCommand, subdir, maxGroups, dependsOn, exclusive, publish, profil, simples, budget, finalCheck, specTotal, strictDone, recheck, startEffort, envRepair, rejectedBy, specBaseCommit, integrationBranch, waitRound}})`
 - `projectRoot`: git repository top (§4) · `baseCommit` (required): `git rev-parse HEAD`, right before the call
 - `groups`: every criterion id of this run once · one group per criterion; two share a group only when one can't be checked without the other; ≤ 3 per group · groups may touch the same files: the fusion resolves conflicts · omitted → one group per criterion · every group: its own developer, in its own copy (`.spec-first/copies/<specId>--…`, hidden from git locally) made from the run's integration branch — never in the project itself
 - `testCommand`: the full suite, run from `subdir` (else the repository top) · only in the strict check, once, by one tester · omit if none
 - `quickTestCommand`: the fast subset (no e2e, no training) — developers, fusions, and one critic per panel (the others read its log), from `subdir` · it is the light check's non-regression · pass it whenever the full suite takes minutes · omitted → each runs only the tests covering its criteria
-- `setupCommand`: makes a fresh copy runnable — dependencies, local config copied from the project, the commit hooks' environment (e.g. `uv sync && cp <root>/.env . && pre-commit install`) · omit if a fresh checkout runs as is
+- `setupCommand`: makes a fresh copy runnable — dependencies, local config copied from the project, the commit hooks' environment (e.g. `uv sync && cp <root>/.env . && pre-commit install`) · omit if a fresh checkout runs as is · an environment every copy would share (one venv outside the project, a single build folder) → give each copy its own in `setupCommand`; impossible → declare it in `exclusive`: shared, it serialises the groups or breaks them
 - commit hooks: always run in the copies, never `--no-verify` · one failing for a cause outside the run's changes → technical block (§4), never a question
 - `subdir`: the project's folder inside the repository (monorepo) · pass it whenever `projectRoot` is not that folder: copies at the repository top, setup and tests from `subdir`
 - `maxGroups`: groups active at once (default 3) — the rest wait, each starts as soon as one finishes · pass it lower when the machine is small or the criteria heavy (training, e2e), higher when he asks to speed up and the machine allows
 - `dependsOn`: `{id: [ids it builds on]}` — the graph drawn at shaping time (§4), for the whole spec: socle criteria and the ones built on them in the same run · independent groups start at once, a dependent one as soon as what it builds on is merged — waiting holds no slot; they do not pass → it waits, « en attente des dépendances » (below) · pass it whenever a criterion builds on another of the run or of `recheck`
 - `exclusive`: `{"<resource>": [ids of the criteria that need it]}` — a GPU machine, a device, a fixed port, a browser profile · the run lends each to one agent at a time · pass it whenever two agents could use the same one at once — two criteria, or one criterion whose developer and tester both touch it (one id is enough) · a plain list → every criterion needs each
 - `publish`: `{actions, criteria}` — the external actions his go authorized (§4), in one readable line, and the ids of the criteria they make true · the CI may start during the run (branch pushed early, if listed); merging, tagging, publishing after the strict check, once every other criterion is validated; checked from outside by a fresh tester · no agent ever waits on them: still running → the run returns `waiting` (§4) · omitted → nothing is pushed, published or merged
-- `budget`: output tokens, only when he set a limit → the run stops cleanly before it, partial report · back from it: commit what passed (« étape N »), then one message — what is done, what remains, an estimate of the tokens it needs, your recommendation, a yes/no to relaunch the rest
+- `profil`: `"rapide"` only when his go chose it (§4) · omitted → `"standard"` · `simples`: with `"rapide"`, the ids of the simple criteria (Haiku)
+- `budget`: output tokens, only when he set a limit → the run stops cleanly before it, partial report · 3 agents dying in a row (a usage limit, an API outage) stop it the same way, `stopped` says which · back from it: commit what passed (« étape N »), then one message — what is done, what remains, an estimate of the tokens it needs, your recommendation, a yes/no to relaunch the rest · resume it as the report's `resume` says: `resumeFromRunId` with the exact same args — one changed arg (a command, a group, a criterion) and every agent runs again — else a new run from its `integrationBranch`
 - `finalCheck`: omit (`"auto"`) → the strict check when every criterion of the spec is in the run (`criteria` + `recheck`), every one validated (none « non vérifié » from this run) and none ran before, else the light check · `"strict"` → force it (his request, or the strict check alone, below) · `"light"` → a run that must not end the spec (an earlier run split off on purpose) · `false` → none
 - `specTotal`: how many criteria the spec counts (each sub-criterion one) — always pass it: no strict check on a run that carries only part of the spec
 - `strictDone: true`: a report of this spec already said `strictCheck: true` → every later run: it ends with the light check, never a second strict check · `strictCheck: true` only when the strict check validated every criterion — one it found failed or left « non vérifié » → the relaunch carries the strict check again (full panel, the judge that found the flaw included)
