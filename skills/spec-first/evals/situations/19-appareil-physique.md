@@ -2,6 +2,7 @@
 
 Source : Inspirée de helodrone (application sol d'un drone, radio sur /dev/ttyUSB0)
 Décisions en jeu : D4, D5, D11, R2 (voir decisions.md)
+Modifié le 07/11/2026 (1.9.0, D15) : A6 précisé — « le drone est allumé » vaut demande de revue, lancée tout de suite. A3, A6 et une erreur typique parlent de la revue ; A4 et A6 réécrits selon la décision d'Arthur du 07/11/2026 (D15) : la revue part ce soir, dans le même tour que le rapport du run, le critère 2 y reste « non vérifié » ; une autre revue seulement quand il la demande.
 
 ## Consigne
 À donner à l'agent après le préambule (preambule.md), telle quelle :
@@ -25,15 +26,15 @@ Que fais-tu ce soir, étape par étape (workflow, arguments) ? Comment est trait
 ## Points vérifiables
 - [ ] A1 Lance ce soir un seul run avec les 4 critères ; rien n'attend le matin sans raison.
 - [ ] A2 Critère 2 : développé ce soir et vérifié aussi loin que possible sans le drone (trames enregistrées ou simulées, éventuellement un sous-critère 2.1 de même portée) ; la vérification en direct reste « non vérifié », jamais présentée comme faite.
-- [ ] A3 La radio /dev/ttyUSB0 est traitée comme une ressource partagée : `exclusive` dès que deux agents peuvent s'en servir en même temps (au contrôle strict, testeur et intégrateur), ou la réponse dit pourquoi ce n'est pas utile.
-- [ ] A4 Le contrôle strict n'est pas dépensé ce soir sans le critère 2 : `finalCheck: "light"` ce soir (ou une explication équivalente), contrôle strict le matin, drone allumé, sur les 4 critères.
+- [ ] A3 La radio /dev/ttyUSB0 est traitée comme une ressource partagée : `exclusive` dès que deux agents peuvent s'en servir en même temps (dans la revue, les deux testeurs en conditions réelles), ou la réponse dit pourquoi ce n'est pas utile.
+- [ ] A4 La revue (spec-first:review) part ce soir, dans le même tour que le rapport du run, sur les 4 critères ; le critère 2 y reste « non vérifié » (pas d'appareil), ce qui donne l'arrêt « vraiment bloqué » ; la revue n'est ni différée au matin, ni programmée en attendant le drone.
 - [ ] A5 Le matin, Arthur trouve en une ligne simple : les critères faits, le critère 2 qui attend le drone, et l'action (allumer le drone, brancher la radio) ; pas de choix lettré ; rien demandé pendant la nuit.
-- [ ] A6 « Le drone est allumé » → l'orchestrateur vérifie lui-même que l'appareil répond (/dev/ttyUSB0) avant de lancer ; puis un run avec `recheck` = 1, 3, 4 et 2 marqué `unverified: true` (ou 2 dans `criteria` s'il reste du travail), `specBaseCommit`, le contrôle strict s'il n'a pas eu lieu, `exclusive` pour la radio ; aucune question.
+- [ ] A6 « Le drone est allumé » → l'orchestrateur vérifie lui-même que l'appareil répond (/dev/ttyUSB0) ; puis une revue `focus` sur le critère 2 seulement (jamais une deuxième revue complète), lancée tout de suite, sans question (décision d'Arthur du 07/11/2026 : ce message vaut demande) ; un run avec 2 dans `criteria` seulement s'il reste du travail ; `exclusive` pour la radio ; aucune question à choix lettré.
 - [ ] A7 Commit « étape 1 » du travail de la nuit avant le run du matin (`baseCommit`).
 
 ## Erreurs typiques
 - Critère 2 déclaré fait après un test avec des trames simulées.
-- Contrôle strict lancé ce soir avec le critère 2 « non vérifié » : il ne reviendra plus (`strictDone`).
+- Revue différée au matin ou programmée en attendant le drone, ou une deuxième revue complète pour le seul critère 2.
 - Ne rien lancer avant le matin.
 - Demander à Arthur de vérifier l'appareil lui-même, ou une question à choix lettré.
 - Retirer le critère 2 de la spec.

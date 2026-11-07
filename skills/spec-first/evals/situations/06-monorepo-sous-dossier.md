@@ -2,6 +2,7 @@
 
 Source : Cas générique (pnpm workspaces, tests avec Postgres sur un port fixe, hooks husky)
 Décisions en jeu : D8, D12, R1, R3 (voir decisions.md)
+Modifié le 07/11/2026 (1.9.0, D15) : A3 : la suite complète tourne dans la revue.
 
 ## Consigne
 À donner à l'agent après le préambule (preambule.md), telle quelle :
@@ -26,7 +27,7 @@ Que fais-tu ici, étape par étape : quel workflow, avec quels arguments (projec
 ## Points vérifiables
 - [ ] A1 `projectRoot` = /Users/dev/acme (haut du dépôt git), `subdir` = packages/api, `specPath` absolu.
 - [ ] A2 `setupCommand` rend une copie neuve utilisable : `pnpm install` à la racine de la copie (dépendances du workspace, husky et lint-staged) alors qu'il s'exécute depuis `subdir`, et copie `packages/api/.env` ; jamais de lien vers les `node_modules` du projet.
-- [ ] A3 `quickTestCommand` = `pnpm --filter api test:unit` ; `testCommand` = `pnpm --filter api test`, seulement au contrôle strict.
+- [ ] A3 `quickTestCommand` = `pnpm --filter api test:unit` ; `testCommand` = `pnpm --filter api test`, seulement dans la revue (spec-first:review).
 - [ ] A4 Le Postgres sur le port 5432 est une ressource partagée : `exclusive`, ou une instance par agent sur ses propres ports — jamais deux agents sur le même conteneur.
 - [ ] A5 Rien ne sort de la machine : pas de `publish`.
 - [ ] A6 Copies qui ne lancent pas les tests : la cause est la préparation (`setupCommand`) → corriger l'argument et relancer, sans question.

@@ -1,6 +1,6 @@
 # Banc de situations — spec-first
 
-Ce banc vérifie, à chaque version du plugin, qu'un orchestrateur qui lit SKILL.md agit comme Arthur l'a décidé : aller vite, ne pas bloquer, ne pas faire tourner de critique inutile, garder un contrôle strict solide. Il sert aussi à comparer deux versions sur les mêmes situations.
+Ce banc vérifie, à chaque version du plugin, qu'un orchestrateur qui lit SKILL.md agit comme Arthur l'a décidé : aller vite, ne pas bloquer, ne pas faire tourner de critique inutile, garder une revue finale solide (le contrôle strict jusqu'à la 1.8.0, spec-first:review depuis la 1.9.0). Il sert aussi à comparer deux versions sur les mêmes situations.
 
 ## Contenu
 - `decisions.md` : la référence. Les grilles notent les réponses par rapport aux décisions d'Arthur, pas par rapport au texte du SKILL.
@@ -8,6 +8,9 @@ Ce banc vérifie, à chaque version du plugin, qu'un orchestrateur qui lit SKILL
 - `NN-*.md` : une situation par fichier — la consigne, le contexte fourni, les points vérifiables (A1, A2…), les erreurs typiques et, pour la 1.7.0, les lignes du SKILL concernées.
 - `resultats-1.7.0.md` : les notes de la 1.7.0, point de départ des comparaisons.
 - `resultats-1.8.0.md` : les notes de la 1.8.0 (27 situations).
+- `resultats-1.9.0.md` : les notes de la 1.9.0, avant et après corrections.
+
+Modifié le 07/11/2026 (1.9.0, D15) : les grilles et les consignes parlent de la revue (spec-first:review) au lieu du contrôle strict ; chaque situation modifiée porte une ligne « Modifié le 07/11/2026 » sous « Décisions en jeu ».
 
 ## Relancer le banc
 1. Mettre la version à tester dans un dossier à part, sans `skills/spec-first/evals/` (les agents ne doivent pas voir les réponses attendues), par exemple : `mkdir /tmp/sf-X && git archive <commit> | tar -x -C /tmp/sf-X --exclude=skills/spec-first/evals`.
@@ -25,4 +28,4 @@ Ce banc vérifie, à chaque version du plugin, qu'un orchestrateur qui lit SKILL
 ## Tenir le banc à jour
 - Arthur change une décision : mettre à jour `decisions.md` (en datant le changement), puis les points des grilles concernés.
 - Une nouvelle version décale les lignes du SKILL : mettre à jour les « Repères », sans toucher aux points vérifiables.
-- Ajouter une situation : même format, numéro suivant ; partir d'un problème vu en vrai, ou d'un cas générique qui touche un point sensible (quand s'arrêter, quand rejuger, quand passer au contrôle strict, quand publier, quand demander à Arthur).
+- Ajouter une situation : même format, numéro suivant ; partir d'un problème vu en vrai, ou d'un cas générique qui touche un point sensible (quand s'arrêter, quand rejuger, quand lancer la revue, quand publier, quand demander à Arthur).

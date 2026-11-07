@@ -2,6 +2,7 @@
 
 Source : Inspirée du run QualiSpectra sur kipp (bibliothèque publiée sur un registre GitLab, puis épinglée dans l'application ; MR, CI, runner plein)
 Décisions en jeu : D9, D11, D12, R1, R3, R4, R5 (voir decisions.md)
+Modifié le 07/11/2026 (1.9.0, D15) : la consigne fait rendre `waiting` et le blocage de CI par la revue (spec-first:review), plus par le run.
 
 ## Consigne
 À donner à l'agent après le préambule (preambule.md), telle quelle :
@@ -22,8 +23,8 @@ Les deux dépôts sont propres (git status vide). glab est installé et connect�
 Arthur vient d'écrire : « La spec me va. Publie la lib, épingle-la dans QualiSpectra, MR vers main, CI verte, fusion et tag. Go. »
 
 Plus tard dans la même session :
-(a) le run de seglab-hsi revient avec : waiting = { kind: "ci", what: "pipeline de la CI de la MR !41", where: "https://git.cetic.be/cetic/seglab-hsi/-/pipelines/4512", check: "glab ci get -p 4512 -R cetic/seglab-hsi", limitMinutes: 60, waitRound: 1 } ; ses critères 1 et 2 sont « bloqué », kind « externe ».
-(b) après la reprise, un job de ce pipeline échoue deux fois avec « No space left on device » sur le runner dgx-02 ; le run revient avec le critère 2 « bloqué », kind « technique », raison « CI indisponible : disque plein sur le runner dgx-02 — job build-wheel. Pour débloquer : libérer de la place sur dgx-02 ».
+(a) la revue de seglab-hsi (spec-first:review) revient avec : waiting = { kind: "ci", what: "pipeline de la CI de la MR !41", where: "https://git.cetic.be/cetic/seglab-hsi/-/pipelines/4512", check: "glab ci get -p 4512 -R cetic/seglab-hsi", limitMinutes: 60, waitRound: 1 } ; ses critères 1 et 2 sont « bloqué », kind « externe ».
+(b) après la reprise, un job de ce pipeline échoue deux fois avec « No space left on device » sur le runner dgx-02 ; la revue revient avec le critère 2 « bloqué », kind « technique », raison « CI indisponible : disque plein sur le runner dgx-02 — job build-wheel. Pour débloquer : libérer de la place sur dgx-02 ».
 
 QUESTION
 Que fais-tu ici, étape par étape : ce que tu vérifies avant de lancer, quel(s) workflow(s) tu lances, avec quels arguments, dans quel ordre, ce que tu dis ou demandes à Arthur et quand, et ce que tu fais en (a) puis en (b) ?

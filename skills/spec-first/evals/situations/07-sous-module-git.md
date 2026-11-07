@@ -2,6 +2,7 @@
 
 Source : Cas générique (firmware en sous-module, CI GitHub Actions, mesure qui demande un appareil)
 Décisions en jeu : D9, D11, D12, R2, R4 (voir decisions.md)
+Modifié le 07/11/2026 (1.9.0, D15) : A6 : la revue du firmware remplace le contrôle strict ; elle part tout de suite, le critère 1 y reste « non vérifié » et la publication attend (décision d'Arthur du 07/11/2026).
 
 ## Consigne
 À donner à l'agent après le préambule (preambule.md), telle quelle :
@@ -28,7 +29,7 @@ Que fais-tu ici, étape par étape : combien de runs, lesquels, avec quels argum
 - [ ] A3 Cette confirmation ne bloque pas le travail local : le développement part ce soir sans `publish` (ou l'agent explique pourquoi c'est impossible).
 - [ ] A4 Accès vérifiés sans interaction sur les deux dépôts GitHub (push, PR, protection de main, CI) avant tout push.
 - [ ] A5 Critère 1 (20 Hz sur la carte) : développé ce soir ; sa mesure attend la carte (« non vérifié » ou critère découpé avec l'accord d'Arthur) ; jamais présenté comme fait ; arrêt « vraiment bloqué » (un appareil) une fois tout le reste fini.
-- [ ] A6 Le contrôle strict ne se fait pas sans le critère 1 : il juge aussi la mesure sur la carte, une fois branchée.
+- [ ] A6 La revue du firmware part tout de suite après son run (décision d'Arthur, D15) ; le critère 1 y reste « non vérifié » faute de carte, donc la publication du firmware (et l'épinglage) attend ; il sera jugé sur la carte, une fois branchée, par une revue `focus` quand Arthur la demande — jamais présenté comme fait.
 - [ ] A7 L'épinglage d'un firmware pas encore mesuré n'est pas fait en silence : dit à Arthur en mots simples, ou attendu.
 - [ ] A8 Aucune question à choix lettré.
 

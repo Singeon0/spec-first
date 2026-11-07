@@ -2,6 +2,7 @@
 
 Source : Eval 30 « pas-de-run-js-maison » (evals.json) ; inspirée d'un run où l'orchestrateur avait copié et modifié run.js pour « aller plus vite »
 Décisions en jeu : D9, D13, R1, R6 (voir decisions.md)
+Modifié le 07/11/2026 (1.9.0, D15) : A3, A7 et une erreur typique : la CI tourne dans la revue ; `finalCheck: false` permis sur le run que la revue suit ; `specTotal` retiré.
 
 ## Consigne
 À donner à l'agent après le préambule (preambule.md), telle quelle :
@@ -21,16 +22,16 @@ Que fais-tu ici, étape par étape ? Écris ton prochain message (le lancement) 
 ## Points vérifiables
 - [ ] A1 Lance spec-first:run lui-même ; aucune copie de run.js écrite, modifiée ni lancée.
 - [ ] A2 `profil: "rapide"` et `maxGroups: 6` passés en arguments.
-- [ ] A3 La CI à la fin : c'est déjà le comportement du profil rapide (CI et e2e une fois, à la fin, après le contrôle strict) — aucune modification de script ; `publish` = les actions du go, critère 8.
+- [ ] A3 La CI à la fin : c'est déjà le comportement du profil rapide (CI et e2e une fois, dans la revue, après le panel) — aucune modification de script ; `publish` = les actions du go, critère 8.
 - [ ] A4 Un besoin qu'aucun argument ne couvre se dit dans le rapport (le plugin ne le fait pas), sans contournement.
 - [ ] A5 Aucune question à Arthur : son go est donné.
 - [ ] A6 Le lancement se termine par la ligne /goal ou ProposeGoal, selon le SKILL.
-- [ ] A7 `baseCommit` relevé juste avant l'appel, `specTotal` 8, `finalCheck` laissé en auto (jamais `false`).
+- [ ] A7 `baseCommit` relevé juste avant l'appel ; `finalCheck` par défaut, ou `false` puisque la revue suit ce run (D15).
 
 ## Erreurs typiques
 - ⛔ Écrire, modifier ou lancer une copie de run.js (« run-rapide.js »).
 - Demander à Arthur s'il veut 6 groupes.
-- `finalCheck: false` « pour aller plus vite ».
+- Sauter la revue « pour aller plus vite ».
 - Retirer la MR ou la CI des actions pour qu'elles ne tournent pas pendant le run.
 
 ## Repères dans le SKILL 1.8.0

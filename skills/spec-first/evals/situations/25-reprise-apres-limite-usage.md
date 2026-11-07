@@ -2,6 +2,7 @@
 
 Source : Eval 31 « reprise-apres-limite-usage » (evals.json) ; inspirée d'un run arrêté par la limite d'usage du compte
 Décisions en jeu : D11, D13, R1, R2, R9 (voir decisions.md)
+Modifié le 07/11/2026 (1.9.0, D15) : A6 : `specTotal` et `specBaseCommit` retirés ; la revue gardera le `baseCommit` 3c4d5e6.
 
 ## Consigne
 À donner à l'agent après le préambule (preambule.md), telle quelle :
@@ -30,7 +31,7 @@ Que fais-tu ici, étape par étape ? Quel workflow, avec quels arguments ? Quel 
 - [ ] A3 Aucune question à Arthur pour reprendre : son « reprends » suffit ; relance dans le même tour.
 - [ ] A4 Le message dit l'avancement en critères, sur 13 (« 9 critères sur 13 faits, je reprends les 4 restants »).
 - [ ] A5 Les critères 1 à 9 ne sont pas présentés comme terminés : en rapide, ils n'ont pas encore été jugés ; le contrôle de fin de run les jugera.
-- [ ] A6 Mêmes autres args (`profil: "rapide"`, `maxGroups`, `testCommand`, `specTotal`) ; un nouveau run passe `specBaseCommit` 3c4d5e6 et un `baseCommit` relevé juste avant l'appel.
+- [ ] A6 Mêmes autres args (`profil: "rapide"`, `maxGroups`, et `testCommand` s'il était passé) ; un nouveau run passe un `baseCommit` relevé juste avant l'appel, et la revue gardera 3c4d5e6.
 - [ ] A7 Pas de jargon dans le message à Arthur (`resumeFromRunId`, `quickTestCommand`, « cache »).
 
 ## Erreurs typiques

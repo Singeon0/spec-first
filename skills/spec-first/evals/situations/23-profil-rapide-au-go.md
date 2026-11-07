@@ -2,6 +2,7 @@
 
 Source : Eval 29 « profil-rapide-au-go » (evals.json), cas générique du profil rapide de la 1.8.0
 Décisions en jeu : D1, D11, D13, D14 (voir decisions.md)
+Modifié le 07/11/2026 (1.9.0, D15) : A1, A4, A5 et une erreur typique : la revue remplace le contrôle strict ; `finalCheck: false` permis sur le run que la revue suit ; `specTotal` retiré.
 
 ## Consigne
 À donner à l'agent après le préambule (preambule.md), telle quelle :
@@ -26,11 +27,11 @@ Quel est ton prochain message à Arthur, mot pour mot ? Que fais-tu ensuite, et 
 - Le préambule et le plugin à la version testée. La spec, la demande d'Arthur et les durées des tests sont dans la consigne.
 
 ## Points vérifiables
-- [ ] A1 La demande de go recommande le profil rapide, en une ligne de français simple : Sonnet et Haiku, aucune critique pendant le run, contrôle final strict.
+- [ ] A1 La demande de go recommande le profil rapide, en une ligne de français simple : Sonnet et Haiku, aucune critique pendant le run, la même revue finale (six relecteurs, deux testeurs en conditions réelles) en Sonnet.
 - [ ] A2 Une estimation des tokens (ou du coût), étiquetée « estimé ».
 - [ ] A3 Rien n'est lancé avant son go : le message finit par une seule question oui/non (le go), sans choix lettré (pas de « A standard / B rapide »).
-- [ ] A4 Répond à « une vraie revue à la fin » : le contrôle final strict tourne toujours en rapide (panel complet, xhigh), une fois que tous les critères passent ; jamais `finalCheck: false`.
-- [ ] A5 À son go : `profil: "rapide"`, `simples` = ["5", "6"], `specTotal` 6, un groupe par critère, `quickTestCommand` = les tests rapides, `testCommand` = les tests complets (une seule fois, au contrôle strict) ; `dependsOn` plausible ou absent.
+- [ ] A4 Répond à « une vraie revue à la fin » : la revue tourne toujours en rapide (même panel fixe, xhigh), une fois que tous les critères passent ; le run que la revue suit peut passer `finalCheck: false` (D15), jamais un run sans revue derrière.
+- [ ] A5 À son go : `profil: "rapide"`, `simples` = ["5", "6"], un groupe par critère, `quickTestCommand` = les tests rapides, `testCommand` = les tests complets (une seule fois, dans la revue) ; `dependsOn` plausible ou absent.
 - [ ] A6 Le message à Arthur reste en français simple : pas de nom d'argument (`simples`, `finalCheck`, `profil`), pas d'efforts détaillés.
 - [ ] A7 Au lancement : la ligne /goal ou ProposeGoal, selon le SKILL.
 
@@ -38,7 +39,7 @@ Quel est ton prochain message à Arthur, mot pour mot ? Que fais-tu ensuite, et 
 - ⛔ Lancer le run avant son go (sa phrase n'est pas un go : la spec et le profil restent à approuver).
 - Choisir le profil standard malgré sa demande, ou choisir rapide pour lui sans le lui dire.
 - Choix lettré entre les deux profils.
-- `finalCheck: false` ou contrôle léger « pour aller vite ».
+- Pas de revue à la fin « pour aller vite », ou `finalCheck: false` sur un run que la revue ne suit pas.
 - Haiku pour un juge ou une fusion ; critères simples hors des critères 5 et 6.
 - Pas d'estimation, ou une estimation présentée comme mesurée.
 

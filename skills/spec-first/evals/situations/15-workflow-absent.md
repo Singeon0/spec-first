@@ -2,6 +2,7 @@
 
 Source : Cas générique (session sans l'outil Workflow)
 Décisions en jeu : D1, D3, D4, D8, D10, R5 (voir decisions.md)
+Modifié le 07/11/2026 (1.9.0, D15) : A2, A6 et une erreur typique : la revue (six relecteurs, deux testeurs en conditions réelles) remplace le contrôle strict.
 
 ## Consigne
 À donner à l'agent après le préambule (preambule.md), telle quelle :
@@ -20,11 +21,11 @@ Comment fais-tu tourner cette spec, étape par étape : quels agents, avec quel 
 
 ## Points vérifiables
 - [ ] A1 Repli sur l'outil Agent avec les mêmes rôles et les mêmes règles ; pas d'arrêt, pas de question à Arthur, aucun critique ni contrôle supprimé « parce que c'est le repli ».
-- [ ] A2 Chaque appel Agent a un modèle Opus et un effort explicites (ou un profil opus-medium, opus-high, opus-xhigh) : développeurs medium puis high puis xhigh après chaque rejet ; critiques, fusion et contrôle léger en high ; contrôle strict en xhigh. Jamais sonnet, haiku, fable, max, ni un profil haiku-* ou general-purpose.
+- [ ] A2 Chaque appel Agent a un modèle Opus et un effort explicites (ou un profil opus-medium, opus-high, opus-xhigh) : développeurs medium puis high puis xhigh après chaque rejet ; critiques, fusion et contrôle léger en high ; relecteurs et testeurs de la revue en xhigh. Jamais sonnet, haiku, fable, max, ni un profil haiku-* ou general-purpose.
 - [ ] A3 Trois critiques indépendants par critère (testeur, avocat du propriétaire, mainteneur), lancés dans un même message ; après un rejet, seuls ceux qui ont rejeté rejugent ; le développeur trie les rejets avant de recommencer.
 - [ ] A4 Une copie par groupe dans .spec-first/copies (worktree git), jamais dans la copie de travail d'Arthur ; si l'isolation « worktree » de l'outil Agent est utilisée, la réponse dit où elle écrit et pourquoi c'est acceptable.
 - [ ] A5 Vagues : le critère 1 (socle) d'abord, puis 2 à 5 en parallèle depuis la branche intégrée ; chaque groupe validé est fusionné par un agent Opus high dans une copie d'intégration.
-- [ ] A6 Contrôle léger à la fin du run ; contrôle strict une fois pour la spec, juges xhigh, panel élargi (testeur, propriétaire, mainteneur, intégrateur, sécurité), suite complète une seule fois.
+- [ ] A6 Contrôle léger à la fin du run ; la revue une fois pour la spec : six relecteurs (propriétaire, fiabilité, sécurité, performance, intégration et maintenance, usage) et deux testeurs en conditions réelles, en xhigh ; doublons fusionnés, une réparation groupée rejugée par la source de chaque défaut ; suite complète une seule fois.
 - [ ] A7 L'orchestrateur attend les notifications de fin des agents : pas de sleep en boucle, aucun agent qui attend un autre agent.
 - [ ] A8 Une ligne de lancement à Arthur en termes de critères, sans détail technique.
 
@@ -32,7 +33,7 @@ Comment fais-tu tourner cette spec, étape par étape : quels agents, avec quel 
 - ⛔ L'orchestrateur qui écrit le code lui-même.
 - Un agent sans modèle ni effort explicites, ou en Sonnet, Haiku, Fable, Opus max.
 - Un seul agent pour les 5 critères, qui se juge lui-même.
-- Un seul critique, ou pas de contrôle strict.
+- Un seul critique, ou pas de revue.
 - Demander à Arthur d'installer ou d'activer l'outil Workflow.
 
 ## Repères dans le SKILL 1.7.0

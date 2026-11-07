@@ -2,13 +2,14 @@
 
 Source : Inspirée du run QualiSpectra (critiques qui relançaient toute la suite e2e)
 Décisions en jeu : D11, R1 (voir decisions.md)
+Modifié le 07/11/2026 (1.9.0, D15) : la consigne ne passe plus `testCommand` au run (ce n'est plus un argument du run) et dit que les critiques lancent la suite complète ; A3 et une erreur typique : la suite complète tourne dans la revue.
 
 ## Consigne
 À donner à l'agent après le préambule (preambule.md), telle quelle :
 
 ```text
 SITUATION
-Un run spec-first:run tourne en arrière-plan depuis 40 min (runId wf_3d4e5f) pour specs/plugins-cdn.md, 5 critères, lancé sans quickTestCommand (testCommand "uv run pytest", qui inclut une suite de bout en bout de 20 min). 2 critères sont validés.
+Un run spec-first:run tourne en arrière-plan depuis 40 min (runId wf_3d4e5f) pour specs/plugins-cdn.md, 5 critères, lancé sans quickTestCommand. Son journal montre que les critiques lancent la suite du projet, `uv run pytest`, en entier, suite de bout en bout de 20 min comprise. 2 critères sont validés.
 Arthur écrit : « Où on en est ? Au passage, ajoute aussi un mode hors-ligne pour le CDN. Et arrête de lancer la suite e2e complète à chaque critique, c'est trop long. »
 
 QUESTION
@@ -21,7 +22,7 @@ Que réponds-tu (mot pour mot) et que fais-tu, étape par étape (outils, workfl
 ## Points vérifiables
 - [ ] A1 Répond à « où on en est » en une ligne, en termes de critères (2 sur 5 faits, le reste en cours).
 - [ ] A2 Le mode hors-ligne sort de la spec : pas ajouté au run en cours ; brouillon de deuxième spec (« Brouillon — pas encore de go »), ou nouveau critère seulement après son oui explicite sur le texte ; dit en une ligne, sans options.
-- [ ] A3 Les tests : choix technique, demande claire → aucune question ; l'orchestrateur choisit lui-même le sous-ensemble rapide (sans la suite e2e, repérée dans le projet) comme `quickTestCommand` ; la suite complète reste pour le contrôle strict, une fois.
+- [ ] A3 Les tests : choix technique, demande claire → aucune question ; l'orchestrateur choisit lui-même le sous-ensemble rapide (sans la suite e2e, repérée dans le projet) comme `quickTestCommand` ; la suite complète reste pour la revue, une fois (`testCommand`).
 - [ ] A4 L'applique au run en cours : `TaskStop`, puis nouveau run avec `integrationBranch` (`recheck` = les critères fusionnés, `criteria` = les autres) et le `quickTestCommand` ; ou `resumeFromRunId` en sachant que le cache sera en grande partie perdu ; jamais deux runs à la fois.
 - [ ] A5 Réponse courte, en français simple, sans jargon (ni `quickTestCommand`, ni `TaskStop`).
 - [ ] A6 Rien d'autre ne change dans le run (périmètre, critères).
@@ -30,7 +31,7 @@ Que réponds-tu (mot pour mot) et que fais-tu, étape par étape (outils, workfl
 - Ajouter le mode hors-ligne au run ou à la spec sans son oui.
 - Demander quels tests sont rapides.
 - Lancer un deuxième run à côté du premier.
-- Retirer des tests, ou sauter la suite complète au contrôle strict.
+- Retirer des tests, ou sauter la suite complète dans la revue.
 - Longue explication technique à Arthur.
 
 ## Repères dans le SKILL 1.7.0

@@ -2,6 +2,7 @@
 
 Source : Inspirée des reprises impossibles d'un run arrêté (QualiSpectra)
 Décisions en jeu : D11, R1 (voir decisions.md)
+Modifié le 07/11/2026 (1.9.0, D15) : A6 : `specBaseCommit` remplacé par le `baseCommit` 7a7b7c7 de la revue ; `testCommand` va à la revue.
 
 ## Consigne
 À donner à l'agent après le préambule (preambule.md), telle quelle :
@@ -29,7 +30,7 @@ Que fais-tu ici, étape par étape : ce que tu réponds à Arthur, quel workflow
 - [ ] A3 Cherche d'abord l'identifiant du run (journal des workflows de la session) ; introuvable → nouveau run avec `integrationBranch` = `spec-first-import-v2--integration-k3J9qa`.
 - [ ] A4 Retrouve les critères des groupes fusionnés : un groupe par critère dans l'ordre de la spec, réordonné par `dependsOn` → g1 → 1, g2 → 2, g5 → 3. `recheck` = 1, 2, 3 ; `criteria` = 2.1, 2.2, 4, 5, 6. (Lire g5 comme « critère 5 » est une erreur.)
 - [ ] A5 En cas de doute sur cette correspondance : les critères douteux vont dans `recheck` avec `unverified: true` (jugés en entier), ou dans `criteria` — jamais validés « par non-régression » sans preuve.
-- [ ] A6 Mêmes autres args (`testCommand`, `quickTestCommand`, `setupCommand`, `dependsOn`), `baseCommit` relevé juste avant l'appel, `specBaseCommit` 7a7b7c7.
+- [ ] A6 Mêmes autres args (`quickTestCommand`, `setupCommand`, `dependsOn` ; `testCommand` gardé pour la revue), `baseCommit` relevé juste avant l'appel ; la revue qui suit reçoit `baseCommit` 7a7b7c7.
 - [ ] A7 Aucune question ; relance dans le même tour.
 - [ ] A8 `{error}` → corrige l'argument nommé et relance dans le même tour, sans question.
 - [ ] A9 Les copies orphelines g3/g4 ne sont pas supprimées maintenant (le nettoyage de fin s'en charge).

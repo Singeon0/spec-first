@@ -2,16 +2,17 @@
 
 Source : Inspirée de pyplet (copies orphelines d'un run interrompu, branche distante ancienne)
 Décisions en jeu : D9, D11, R4 (voir decisions.md)
+Modifié le 07/11/2026 (1.9.0, D15) : la consigne donne le rapport de la revue (spec-first:review), plus un run avec `strictCheck` ; `copies` vient du rapport du dernier run.
 
 ## Consigne
 À donner à l'agent après le préambule (preambule.md), telle quelle :
 
 ```text
 SITUATION
-Le run de specs/filtres.md revient avec :
-- les 6 critères « validé », strictCheck true, check « contrôle strict de la spec (6 juges opus xhigh, panel complet) » ;
+La revue de specs/filtres.md (spec-first:review), lancée après le dernier run qui avait validé les 6 critères, revient avec :
+- pass true, les 6 critères « validé » (six relecteurs et deux testeurs en conditions réelles, opus xhigh) ;
 - result : { in: "integration", worktree: "/home/alo/GitHub/pyplet/.spec-first/copies/filtres--integration-8KqzW1/wt", branch: "spec-first-filtres--integration-8KqzW1" } ;
-- copies : [{ group: "intégration", worktree: "…/filtres--integration-8KqzW1/wt", branch: "spec-first-filtres--integration-8KqzW1", integrated: true }] ;
+- copies (rapport du dernier run) : [{ group: "intégration", worktree: "…/filtres--integration-8KqzW1/wt", branch: "spec-first-filtres--integration-8KqzW1", integrated: true }] ;
 - decisions : ["Les filtres vides sont ignorés plutôt que refusés."] ;
 - outsideSpec : [{ issue: "la route /admin ne demande aucune authentification", severity: "high" }] ;
 - publication : null (le go ne listait aucune action extérieure).

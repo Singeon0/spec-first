@@ -2,6 +2,7 @@
 
 Source : Inspirée de helodrone et du DGX (entraînement, serveur sur un port imposé)
 Décisions en jeu : D5, R5 (voir decisions.md)
+Modifié le 07/11/2026 (1.9.0, D15) : A3 : la suite complète tourne dans la revue.
 
 ## Consigne
 À donner à l'agent après le préambule (preambule.md), telle quelle :
@@ -28,7 +29,7 @@ Que fais-tu ici, étape par étape : quel workflow, avec quels arguments (groups
 ## Points vérifiables
 - [ ] A1 Un groupe par critère ; `dependsOn` plausible (3 dépend de 1 et 2 ; 5 dépend de 4 ; 6 dépend de ce qu'il liste) ; un seul run, en vagues.
 - [ ] A2 `exclusive` : la carte graphique pour les critères qui l'utilisent (au moins 3), le port 8080 pour 4 et 5.
-- [ ] A3 `quickTestCommand` = les tests rapides ; `testCommand` (25 min) seulement au contrôle strict ; jamais la suite complète à chaque critique.
+- [ ] A3 `quickTestCommand` = les tests rapides ; `testCommand` (25 min) seulement dans la revue ; jamais la suite complète à chaque critique.
 - [ ] A4 Un critique qui a besoin de la carte pendant qu'un développeur l'utilise : le run la prête à un seul agent à la fois ; aucun agent n'attend dans un shell ; ce n'est ni un échec ni une question.
 - [ ] A5 Entraînement de 3 h : pas une attente externe ; le développeur le lance en arrière-plan avec des attentes bornées ; le chien de garde ne tue pas un agent dont le journal d'entraînement avance.
 - [ ] A6 Le testeur mesure le modèle produit et vérifie sa provenance au lieu de réentraîner (sauf preuve douteuse).

@@ -2,6 +2,7 @@
 
 Source : Inspirée de helodrone/ai-training et du DGX kipp (entraînement par ssh)
 Décisions en jeu : D1, D11, D12, R3, R5 (voir decisions.md)
+Modifié le 07/11/2026 (1.9.0, D15) : A2 : la suite complète tourne dans la revue.
 
 ## Consigne
 À donner à l'agent après le préambule (preambule.md), telle quelle :
@@ -24,7 +25,7 @@ Que fais-tu ici, étape par étape : ce que tu vérifies avant de lancer, quel w
 
 ## Points vérifiables
 - [ ] A1 Avant de lancer, vérifie l'accès sans interaction : `ssh -o BatchMode=yes kipp` (aucune demande de mot de passe), carte graphique libre, place disque, données présentes.
-- [ ] A2 Un run, en vagues : 2 dépend de 1, 3 dépend de 2, 4 dépend de 2 et 3 (ou équivalent justifié) ; `exclusive` pour la carte de kipp sur les critères qui l'utilisent ; `quickTestCommand` sans entraînement ; `testCommand` seulement au contrôle strict.
+- [ ] A2 Un run, en vagues : 2 dépend de 1, 3 dépend de 2, 4 dépend de 2 et 3 (ou équivalent justifié) ; `exclusive` pour la carte de kipp sur les critères qui l'utilisent ; `quickTestCommand` sans entraînement ; `testCommand` seulement dans la revue.
 - [ ] A3 Les 5 h : lancées par le développeur du critère 2 en arrière-plan sur kipp (journal dans un fichier), attentes courtes répétées (5 min maximum chacune) ; aucune commande bloquante de 5 h, aucun sleep en boucle ; le chien de garde (`ScheduleWakeup` d'au moins 1 h) lit le journal et n'arrête pas un agent dont l'entraînement avance.
 - [ ] A4 Les critiques du critère 2 ne réentraînent pas : ils mesurent le modèle produit sur le jeu de test figé et vérifient sa provenance (journal, fichier de poids, configuration, empreinte du découpage) ; réentraînement seulement si la preuve est douteuse.
 - [ ] A5 Messages à Arthur : une ligne au lancement ; demain, le résultat en termes de critères, chiffres étiquetés « mesuré » ou « estimé ».

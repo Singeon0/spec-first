@@ -26,17 +26,17 @@ During the run the main agent is an orchestrator: it cuts the work into
 what can run at the same time and fans it out through the Workflow tool.
 Every sub-agent is Opus, medium at least: Opus medium for real work, Opus
 high for every critic of the run, the light check and the fusion, Opus
-xhigh for every critic of the strict check and the publication tester,
-high then xhigh for a developer after each rejection. Never Sonnet, Haiku
+xhigh for the reviewers and live testers of the review and the publication
+tester, high then xhigh for a developer after each rejection. Never Sonnet, Haiku
 or Fable, never Opus max.
 
 That is the « standard » profile. When the owner chooses speed at his go,
 the « rapide » profile runs the same engine lighter: Sonnet developers
 (Haiku for the criteria marked simple, and for the plumbing), the same
 medium → high → xhigh escalation, no critics during the run — a
-criterion the developer's self-check passes goes on — and a check at the
-end that always runs, with Sonnet judges: the strict check once every
-criterion passes. CI and end-to-end tests run once, at the end. Whatever
+criterion the developer's self-check passes goes on — and the same review
+at the end, with Sonnet reviewers. CI and end-to-end tests run once, in
+the review. Whatever
 the profile, the orchestrator never writes its own copy of the workflow:
 what it would change is an argument.
 
@@ -50,9 +50,30 @@ tester instead):
 | Developer, one per criterion (two share one only when one can't be checked without the other) | Opus medium → high → xhigh after each rejection |
 | Critics: tester, owner's advocate, maintainer, blind to each other; after a rejection only those that did not pass judge again | Opus high |
 | Fusion, group by group as soon as each is done, into one integration branch that later rework starts from | Opus high |
-| Light check, at the end of every run that does not complete the spec: a tester (the run's criteria on the merged result when groups were combined, the earlier criteria by a quick non-regression), and an integrator when groups were combined | Opus high |
-| Strict check, once per spec, when every criterion passes: every criterion on the whole result — one tester per three criteria, owner's advocate, maintainer, security, and an integrator when parts were combined | Opus xhigh |
-| Repair, if a check finds a criterion broken — only the critics that did not pass it judge again | Opus medium → high → xhigh |
+| Light check, at the end of every run: a tester (the run's criteria on the merged result when groups were combined, the earlier criteria by a quick non-regression), and an integrator when groups were combined | Opus high |
+| Repair, if the light check finds a criterion broken — only the critics that did not pass it judge again | Opus medium → high → xhigh |
+
+## The review
+
+Once every criterion passes, a second workflow, `spec-first:review`
+(`workflows/review.js`), judges the whole spec once. Its panel has a fixed
+size, whatever the number of criteria:
+
+| Role | Model |
+|---|---|
+| Six reviewers, one angle each — owner's advocate, reliability, security, performance, integration and maintenance, usage — each reading the whole spec and every commit of it | Opus xhigh |
+| Two live testers, whatever the size of the spec: they start the real result and drive it with Chrome DevTools along user journeys that cover every criterion, each in its own isolated browser context; the first runs the full suite once | Opus xhigh |
+| Merging duplicate findings | Opus high |
+| One live tester tries the reviewers' unproven leads | Opus xhigh |
+| One developer repairs every proven blocking or major defect, in one batch; only the reviewer that raised each one re-judges it, plus a live replay by the criterion's tester — two rounds at most | Opus high → xhigh |
+
+Minor defects are reported, never repaired. A criterion the review still
+rejects goes back to a development run (`rejectedBy` from the review's
+`relaunch`), then to the review with `focus`: only the reviewers that
+rejected it judge again, with a live replay — never the full panel twice.
+The review also starts the remote CI and, once it passes, applies the
+external actions the owner authorized. The two workflows are separate on
+purpose: either can run without the other.
 
 After a rejection the developer first sorts the cause: a slip is fixed at
 the root, an approach that can't satisfy the criterion is replaced, never
@@ -66,10 +87,9 @@ to the owner — but only once everything else is done. A technical block
 that never answered) is never relaunched as is and never turned into a
 question: the owner gets its cause and the one action that lifts it.
 
-The strict check is the expensive one, so it runs once per spec, on the
-whole integrated result, when every criterion passes. Every other run
-ends with a light check of its own changes, and its report says which
-check ran. A relaunch re-judges only what changed: the relaunched
+The review is the expensive part, so it runs once per spec, on the whole
+integrated result, when every criterion passes. Every run ends with a
+light check of its own changes. A relaunch re-judges only what changed: the relaunched
 criterion gets its own critics, the others a quick non-regression. A
 criterion broken only by its environment gets a targeted repair (`envRepair`),
 re-judged by the critics that rejected it — no new developer round with the
@@ -83,7 +103,7 @@ through it. The orchestrator may wrap the workflow in workflows of its
 own (research before the developers start, for instance); when the
 Workflow tool is missing or fails, it falls back to plain sub-agents.
 Either way the rules stay the same: models, efforts, the three critics,
-the light and strict checks. When the workflow returns `{error}`, the orchestrator
+the light check, the review. When the workflow returns `{error}`, the orchestrator
 first fixes the arguments it names and relaunches it. The owner's
 « accélère », « reprends » or « relance » become arguments of the same
 workflow (more groups at once, a resume, the criteria left).
@@ -106,30 +126,30 @@ Its arguments, and when the orchestrator passes them:
 | Argument | When |
 |---|---|
 | `groups` | criteria that can't be checked apart share a group (three at most); omitted → one group per criterion |
-| `testCommand` | the full suite, run only in the strict check, once |
 | `quickTestCommand` | whenever the full suite takes minutes: developers, fusions and one critic per panel run this fast subset; it is the light check's non-regression |
 | `setupCommand` | when a fresh copy needs dependencies, local config or the commit hooks' environment to run |
 | `subdir` | in a monorepo: the project's folder; copies are made at the repository top, setup and tests run from it |
 | `maxGroups` | groups active at once, three by default: lower on a small machine, higher when the owner asks to speed up |
 | `dependsOn` | the dependency graph of the spec: a group starts as soon as what it builds on is merged, without holding a slot while it waits — one run for the whole spec |
 | `exclusive` | a resource two criteria would use at once (a GPU machine, a device, a fixed port), with the criteria that need it: the run lends it to one agent at a time |
-| `publish` | the external actions the owner's go authorized, and the criteria they make true |
+| `publish` | the criteria the publication makes true: prepared in the run, published by the review |
 | `profil` | `"rapide"` when the owner's go chose it, with `simples` (the criteria Haiku takes); omitted → `"standard"` |
 | `budget` | when the owner set a token limit: the run stops cleanly before it — as it does after three agents in a row die (a usage limit, an API outage); its `resume` says how to go on: the same run id with the exact same args (only `budget` and `maxGroups` may change), or its integration branch |
-| `finalCheck` | omitted: the strict check when every criterion passes and no strict check of the spec ran before (no `strictDone`), the light check otherwise; `"strict"` or `"light"` force one, `false` none |
-| `strictDone` | a strict check of this spec already ran — even one that rejected a criterion: later runs end with the light check, the rejected criterion re-judged by the judges that rejected it |
-| `recheck` | criteria an earlier run validated: re-checked by non-regression in the light check, judged again in the strict check; a « non vérifié » one carries `unverified: true` and is judged in full; with `criteria: []` and `finalCheck: "strict"`, the strict check alone |
+| `finalCheck` | omitted: the light check; `false`: none (the « rapide » run the review follows at once) |
+| `recheck` | criteria an earlier run validated: re-checked by non-regression in the light check; a « non vérifié » one carries `unverified: true` and is judged in full |
 | `startEffort` | a relaunched criterion resumes from the effort it reached |
 | `envRepair` | a criterion broken by its environment or configuration: a targeted repair, re-judged by the critics that rejected it |
-| `rejectedBy` | a criterion relaunched after « en échec »: only the critics that rejected it judge it again; `{ critics, proof }` passes them a fact (the spec sentence a rejection contradicts, or the flaw the strict check found); a strict-check judge (security, integrator) that rejected it comes back itself, at the strict level |
-| `specBaseCommit` | every later run of a spec (a relaunch): the strict security and maintainer read the whole spec's changes |
+| `rejectedBy` | a criterion relaunched after « en échec » or after the review: only the critics that rejected it judge it again; `{ critics, proof }` passes them a fact (the spec sentence a rejection contradicts, or the flaw the review found) |
 | `integrationBranch` | resuming an interrupted run whose run id is lost: the new run starts from the branch it left |
-| `waitRound` | resuming a run that stopped on an external wait (CI, registry, review) |
+
+The review's own arguments: `baseCommit` (the spec's first commit), every
+criterion, `workspace` and `branch` (the run's integration copy),
+`testCommand`, `publish`, `profil`, `focus`, `waitRound`.
 
 Criteria the others build on (« socle ») are drawn as a dependency graph
 when the spec is shaped, and the whole spec goes in one run: independent
 criteria start at once, dependent ones as soon as what they build on is
-merged — one integration copy, one strict check. Two runs never overlap
+merged — one integration copy, one review. Two runs never overlap
 on the same repository. Several repositories → one run each: independent ones
 are launched together, a dependent one once the upstream publication is
 done, all under the same `/goal` line. A run interrupted (stopped,
@@ -149,15 +169,15 @@ runners) and lists, in one line, every external action
 the run will take: publish a version, push a branch — including the early
 push that starts the CI during the run —, open and merge a merge request,
 tag. The owner's go authorizes those actions, and only those (`publish`).
-Merging, tagging and publishing run after the strict check, once every
-other criterion is validated; a fresh tester checks them from outside.
-When they go through a remote CI, its pipeline starts as soon as the
-first group they depend on is merged, and its result counts in the
-check — in the « rapide » profile, only once, at the publication. No agent ever waits for something outside the machine (a
-pipeline, a registry, a review, a deployment): the run stops cleanly
+Merging, tagging and publishing run at the end of the review, once it
+passes; a fresh tester checks them from outside. When they go through a
+remote CI, its pipeline starts with the review and its failures join the
+review's repair — in the « rapide » profile, only once, at the
+publication. No agent ever waits for something outside the machine (a
+pipeline, a registry, a human review, a deployment): the review stops cleanly
 with what it waits for, where to look and the command that tells it is
-done; Claude watches it outside the run and resumes the run where it
-stopped. Each time the run returns, Claude writes its readable state
+done; Claude watches it outside and resumes the review where it
+stopped. Each time a workflow returns, Claude writes its readable state
 (step, criteria, waits) to `.spec-first/copies/<spec>--etat.md`.
 
 A criterion held back only because criteria it depends on did not pass

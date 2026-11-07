@@ -2,6 +2,7 @@
 
 Source : Inspirée du run QualiSpectra (Arthur demande d'aller plus vite, et propose des copies à la main)
 Décisions en jeu : D5, R1 (voir decisions.md)
+Modifié le 07/11/2026 (1.9.0, D15) : A4 : `specBaseCommit` retiré (la revue garde le `baseCommit` d'origine).
 
 ## Consigne
 À donner à l'agent après le préambule (preambule.md), telle quelle :
@@ -22,7 +23,7 @@ Que fais-tu ici, étape par étape : quels outils et quel workflow tu utilises, 
 - [ ] A1 Traite les deux demandes séparément : « accélère » devient un argument du run (`maxGroups` relevé) ; les « copies à la main » sont refusées (tout passe par `spec-first:run`), avec une phrase simple pour Arthur (chaque critère a déjà sa copie).
 - [ ] A2 Choisit un `maxGroups` plus haut et le justifie par la machine (20 cœurs, 30 % de CPU) ; garde `exclusive {"gpu": ["7", "8"]}` : les deux critères qui ont besoin de la carte restent l'un après l'autre.
 - [ ] A3 Jamais deux runs à la fois sur le dépôt : arrête le run en cours (`TaskStop`) avant d'en reprendre ou d'en lancer un autre.
-- [ ] A4 Reprise expliquée, l'une ou l'autre : `resumeFromRunId` (paramètre de l'outil Workflow, pas une clé de `args`) avec les mêmes args sauf `maxGroups` ; ou nouveau run avec `integrationBranch` = la branche d'intégration du run, `recheck` = les 4 critères fusionnés, `criteria` = les 8 autres, `specBaseCommit` = le `baseCommit` d'origine.
+- [ ] A4 Reprise expliquée, l'une ou l'autre : `resumeFromRunId` (paramètre de l'outil Workflow, pas une clé de `args`) avec les mêmes args sauf `maxGroups` ; ou nouveau run avec `integrationBranch` = la branche d'intégration du run, `recheck` = les 4 critères fusionnés, `criteria` = les 8 autres (la revue gardera le `baseCommit` d'origine).
 - [ ] A5 Si la reprise ne récupère presque rien du cache : `TaskStop`, puis nouveau run avec `integrationBranch` (rien de ce qui est fusionné n'est perdu), sans question.
 - [ ] A6 Réponse à Arthur courte, en français simple, en résultat (« 6 critères travaillés en même temps »), sans technique ni question ; ligne d'attente en critères, sur 12.
 

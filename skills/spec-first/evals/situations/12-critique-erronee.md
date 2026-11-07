@@ -2,6 +2,7 @@
 
 Source : Cas générique (un critique contredit le texte même du critère)
 Décisions en jeu : D2, D3, D11, R2 (voir decisions.md)
+Modifié le 07/11/2026 (1.9.0, D15) : A4 : plus de `specBaseCommit` ni `strictDone` ; la revue reçoit `baseCommit` 5e5e5e5.
 
 ## Consigne
 À donner à l'agent après le préambule (preambule.md), telle quelle :
@@ -25,7 +26,7 @@ Que fais-tu ici, étape par étape : quel workflow, avec quels arguments ? Que d
 - [ ] A1 Lit le rejet contre le texte du critère : le critère 3 demande lui-même utils/dates.py ; le rejet du mainteneur est une erreur du critique, ni un défaut du code ni une mauvaise approche.
 - [ ] A2 Ne pousse pas le développeur vers une troisième façon de faire qui éviterait utils/dates.py (ce serait sortir du critère) ; le travail qui suit le texte est gardé.
 - [ ] A3 Commit « étape 1 » (squash de la branche d'intégration) avant la relance ; il devient le `baseCommit`.
-- [ ] A4 Une seule relance du critère 3 : `startEffort {"3": "xhigh"}`, `recheck` = 1, 2, 4, `specBaseCommit` 5e5e5e5, pas de `strictDone` (aucun contrôle strict n'a tourné), `finalCheck` auto ; le critère passé tel qu'il est écrit dans la spec.
+- [ ] A4 Une seule relance du critère 3 : `startEffort {"3": "xhigh"}`, `recheck` = 1, 2, 4, `finalCheck` par défaut, puis la revue avec `baseCommit` 5e5e5e5 ; le critère passé tel qu'il est écrit dans la spec.
 - [ ] A5 Fait arriver l'information qui manquait au tour suivant (la phrase du critère qui contredit le rejet), ou dit clairement que la 1.7.0 n'a aucun moyen de la transmettre ni de classer un rejet « critique erronée ».
 - [ ] A6 Aucune question à Arthur pendant le run, et jamais une question technique ; une ligne d'avancement en critères.
 - [ ] A7 Rejeté encore pour la même raison : pas de troisième relance ; arrêt une fois le reste fini, en français simple : ce que demande la spec, ce que le critique refuse, une recommandation, une question oui/non sans choix lettré ; le travail déjà fait est commité.
