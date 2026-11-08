@@ -98,6 +98,16 @@ Good: « Le raccourci peut interférer avec la sélection dans un cas rare. Je r
 - something to publish (a release, a merge request merged, a version pinned) → a criterion like any other, checkable from outside (« seglab-hsi 0.13.2 s'installe depuis le registre GitLab »)
 No steps, technical choices or how — he approves an outcome, not a method. Clarify first only what changes the spec, batched in one message, each point as your recommendation the go accepts (§3); never a questionnaire (offloads your thinking onto him).
 
+**Spec written → spec review, before the go** (his decision): in one message, three sub-agents `Agent` with `subagent_type: "opus-xhigh"`, in parallel — plain sub-agents, read-only, no workflow, no worktree, none sees the others. Each gets the spec path, the project root, the recorded decisions and its one angle:
+- testable criteria — each one observable by a tester from outside, one behaviour, no ambiguity, no « ça dépend »
+- completeness and contradictions — missed edge cases, criteria contradicting each other, the existing code, an earlier spec or a recorded decision; a decision left open
+- feasibility and cut — dependencies and « socle », exclusive resources, external actions, size, criteria to split
+Each returns its findings, each one quoting the spec sentence and proposing the fix. You then:
+- fix at once in the spec, yourself, without asking: wording, a vague criterion made observable, a split, a missing edge case that follows from what he asked, a dependency
+- only what carries a decision — the outcome changes, a criterion added or dropped beyond what he asked, a choice between behaviours, a limit crossed, a change to plan → in the go request, as your recommendation in a yes/no (§3)
+- a finding you judge wrong → dropped, never shown
+Once per spec; again only if he asks. The go request says in one line what the review fixed.
+
 **Clean git — you make it so; he never commits by hand.** Before asking for the go:
 - git repository top: `git rev-parse --show-toplevel` (project in a sub-folder → `projectRoot` = that top, `subdir` = the sub-folder) · a sub-project with its own `.git` (e.g. `pyplet/apps/QualiSpectra`) = its own `projectRoot`
 - nothing uncommitted but the spec: `git status --porcelain`
