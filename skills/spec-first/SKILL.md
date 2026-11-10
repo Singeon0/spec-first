@@ -144,7 +144,7 @@ Once per spec; again only if he asks. The go request says in one line what the r
 - tick a criterion in the spec only when the critics pass it; untick it if the review rejects it
 - fails → the developer sorts the cause (a slip to fix, an approach to change, or the environment — a config file, a setting) and goes one effort tier up (§7); 3 failed rounds → relaunched once, from the effort it reached, together with every other criterion to relaunch (one run, one group each, §7); fails again → stop point, once all the rest is done
 - a relaunch re-judges only what changed: the criterion (its own critics) + a quick non-regression of the others — never the whole panel again; broken by its environment only → a targeted repair, re-judged by the critics that rejected it (`envRepair`, §7)
-- the review rejects a criterion after its two repair rounds → relaunched in a run (`rejectedBy` from the review's `relaunch`), then the review again with `focus`: only the reviewers that rejected it and a live replay — never the full panel twice
+- the review rejects a criterion after its three repair rounds → relaunched in a run (`rejectedBy` from the review's `relaunch`), then the review again with `focus`: only the reviewers that rejected it and a live replay — never the full panel twice
 - unverified → « non vérifié », never presented as done
 
 **Go → stop point: every message carries a tool call** (except the wait line below). A message without one ends your turn and stops the work; the only such message: the stop itself.
@@ -223,8 +223,8 @@ You orchestrate: you neither write nor judge the code — sub-agents do. Your jo
 **Models — profile « standard » (default): Opus only, medium at least** (his decision: every agent gets real work, of uneven difficulty)
 - **Opus medium**: default for real work — developing, analysing, research, aggregating, publishing.
 - **Opus high**: every critic during the run · the light check · fusion · merging the review's duplicates.
-- **Opus xhigh**: the six reviewers and the live testers of the review · the publication tester.
-- **Opus high → xhigh**: a developer (or the publisher) after each rejection, one tier up · the review's repair (two rounds: high, then xhigh).
+- **Opus xhigh**: the six reviewers and the live testers of the review · the review's repair (three rounds, always xhigh) · the publication tester.
+- **Opus high → xhigh**: a developer (or the publisher) after each rejection, one tier up.
 - Never Sonnet, Haiku or Fable · never Opus max (his call alone).
 - Every agent you launch: explicit model + effort (else it takes your session's, max included).
 
@@ -252,7 +252,7 @@ every criterion of the spec passes → REVIEW (spec-first:review), once per spec
   + 2 live testers (Chrome DevTools, user journeys covering every criterion), all xhigh, blind to each other
   → duplicates merged → unproven leads tried live by one tester
   → one developer repairs every proven blocking or major defect, in one batch (high, then xhigh)
-  → only the reviewer that raised each defect re-judges it + a live replay — two rounds at most; minor defects reported, never repaired
+  → only the reviewer that raised each defect re-judges it + a live replay — three rounds at most; minor defects reported, never repaired
   → passes → the publication his go authorized
 ```
 
