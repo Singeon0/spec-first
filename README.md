@@ -208,3 +208,12 @@ conversation; the run never grows to cover it.
 While a workflow runs in the background, the main agent ends its turn on a
 one-line status and never polls; the workflow's completion notification
 resumes the run, so the owner never has to type « continue ».
+
+## Tests
+
+```
+node --test tests/*.test.mjs
+```
+
+They run the workflows with a fake `agent` and a `parallel` that, like the
+Workflow runtime, hands back copies of the jobs' results.

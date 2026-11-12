@@ -611,21 +611,23 @@ You hold the exclusive resource(s) ${RESOURCES.map(x => `« ${x} »`).join(', ')
 
 ${COMMON_RULES}`
     return ask(prompt, { ...REVIEWER, schema: REJUDGE_SCHEMA, phase: 'Réparation', locks: isTester ? locksFor(fs.map(f => f.criterion).concat(replay.map(c => c.id))) : [], label: `${round > 0 ? `Après réparation ${round}` : 'Rejugement'} — ${labelOf(k)} (${REVIEWER.model} ${REVIEWER.effort})` })
-      .then(r => ({ k, fs, r }))
   })
+  // parallel() hands back copies, never the jobs' own objects: the votes go on the findings themselves,
+  // taken from bySource by position — a vote recorded on a copy is lost (QualiSpectra, 1.9.3).
   const outs = await parallel(jobs)
+  const sources = [...bySource]
   const fresh = []
-  for (const o of outs) {
-    if (!o) continue
-    if (!o.r) { for (const f of o.fs) f.unanswered = (f.unanswered || 0) + 1; continue }
-    for (const x of o.r.results || []) {
-      const f = o.fs.find(y => y.n === Number(x.n))
+  sources.forEach(([k, fs], i) => {
+    const r = outs && outs[i]
+    if (!r) { for (const f of fs) f.unanswered = (f.unanswered || 0) + 1; return }
+    for (const x of r.results || []) {
+      const f = fs.find(y => y.n === Number(x.n))
       if (!f) continue
       f.votes = f.votes || {}
-      f.votes[o.k] = { fixed: !!x.fixed && !x.unverifiable, unverifiable: !!x.unverifiable, proof: x.proof }
+      f.votes[k] = { fixed: !!x.fixed && !x.unverifiable, unverifiable: !!x.unverifiable, proof: x.proof }
     }
-    for (const d of o.r.newDefects || []) fresh.push({ ...d, criterion: byId[d.criterion] ? d.criterion : GENERAL, from: [o.k], n: findings.length + fresh.length + 1, fromRepair: round })
-  }
+    for (const d of r.newDefects || []) fresh.push({ ...d, criterion: byId[d.criterion] ? d.criterion : GENERAL, from: [k], n: findings.length + fresh.length + 1, fromRepair: round })
+  })
   for (const f of open) {
     const vs = Object.values(f.votes || {})
     // Fixed when every source that answered says so, and at least one answered.
