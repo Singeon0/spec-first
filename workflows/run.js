@@ -346,7 +346,7 @@ const VERDICT = {
   type: 'object',
   properties: {
     verdict: { type: 'string', enum: ['pass', 'defect', 'unverifiable'] },
-    proof: { type: 'string', description: 'what you ran or read and what you observed; for a defect, the reproduction' },
+    proof: { type: 'string', description: 'what you ran or read and what you observed; for a defect, the reproduction. At most 500 characters: the command and the decisive output line, never a whole log.' },
     note: { type: 'string', description: 'a suspicion or an edge case you could not prove: a lead for the developer, never a defect' },
     cause: { type: 'string', enum: ['code', 'environment'], description: 'for a defect: "environment" when the code is right but its environment or configuration is wrong (a config file, a setting, a local file the project expects), else "code"' },
   },
@@ -502,7 +502,7 @@ const integCopyCommand = `${ENSURE_HIDDEN} && w=$(git worktree list --porcelain 
 const isCopy = ws => !!ws && ws !== ROOT && ws.includes(`/${COPIES}/`)
 const PREPARE = `${setupCommand
   ? `Prepare it right after creating it: run \`${setupCommand}\` from ${SUBDIR ? `its ${SUBDIR} folder` : 'its root'}.`
-  : `If the project needs what git ignores to run, install its dependencies in the copy the project's usual way and copy its local config (e.g. .env) from ${inSub(ROOT)}.`} The commit hooks must run in the copy too. Never link the project's own dependency folders (.venv, node_modules): the tests would run the project's code, not the copy's. A copy holds tracked files only; never commit what you add to prepare it.`
+  : `If the project needs what git ignores to run, install its dependencies in the copy the project's usual way and copy its local config (e.g. .env) from ${inSub(ROOT)}.`} The commit hooks already run in the copy (a worktree): never read or change their configuration (core.hooksPath, .githooks, .git/hooks). Never link the project's own dependency folders (.venv, node_modules): the tests would run the project's code, not the copy's. A copy holds tracked files only; never commit what you add to prepare it.`
 // What a fusion may drop from a group's work: this list only, everything else is the group's work.
 const DROP = `only these, when ${BASE} did not track them: local config copied in (.env, .env.local, .env.*.local), dependency folders (.venv, venv, node_modules), caches (__pycache__, *.pyc, .pytest_cache, .mypy_cache, .ruff_cache, .cache), build outputs (dist, build, .next, coverage), .DS_Store`
 
@@ -531,12 +531,12 @@ const COMMON_RULES = `Rules for everyone in this run:
 - The owner's limits bind everyone: what he forbade (the spec's « Limites » and out-of-scope list, CLAUDE.md, his recorded decisions), exceptions read exactly as written — never widened to a branch, a file or a source they do not name. A criterion you cannot meet without crossing one → say so (a developer: in "blocker"), never a workaround.
 - Never: push, force-push, deploy, publish, send anything outside this machine, delete data you did not create in this run, touch production data — the one exception: an agent whose prompt quotes the owner's authorized actions, for exactly those. Do not edit the spec file.
 - Non-interactive only: nothing may wait for a keyboard — \`GIT_TERMINAL_PROMPT=0\` for git, \`ssh -o BatchMode=yes\`, CLI flags that never prompt. A command asks for a password or a confirmation → stop it: that access is missing; say so.
-- Long commands (over 2 minutes: end-to-end tests, a pipeline, a training): start them in the background with their output in a file, then wait in short bounded steps — each wait one command of at most 5 minutes (\`timeout\`, or a loop with a maximum count that reads that file or checks \`kill -0 <pid>\`), repeated as long as needed: a shell command is cut after 10 minutes. Never \`pgrep -f\` on a pattern (it finds itself), never one \`sleep\` after another. Remote CI: read its state through its API (glab, gh, curl), at least 60 s between reads, the total limit stated before you start.
+- Long commands (over 2 minutes: end-to-end tests, a pipeline, a training): in the background, output in a file, then wait only with \`timeout 300 bash -c 'until <done test>; do sleep 10; done'\`, repeated as needed (the done test reads that file or \`kill -0 <pid>\`) — the tool refuses \`sleep N && …\` and \`sleep N; …\`. A shell command is cut after 10 minutes. Never \`pgrep -f\` on a pattern (it finds itself). Remote CI: read it through its API (glab, gh, curl), 60 s apart at least, the total limit stated before you start.
 - No command may stop on a permission prompt: no one approves it. Delete only fixed paths you created, under your copy or the scratch folder — never \`rm\` with a command substitution (\`$(…)\`) or a variable built at run time, never clean /tmp or a folder other agents use.
 - Shared resources (database, containers): from a copy, never use the main project's. If a criterion needs one, start your own throwaway instance on your ports and stop it before you return; if you cannot, say what is missing — a critic's verdict is then "unverifiable".
 ${EXCL_RULE ? `- ${EXCL_RULE}\n` : ''}- CLAUDE.md and the project's conventions apply as usual.`
 
-const HOOK_RULE = `Commit hooks always run: never bypass them (--no-verify). A hook fails because of your changes → fix the cause. It fails for a reason outside your changes (a tool it needs is missing, the environment) → return a blocker starting with "${TECH}" and the cause in a few French words.`
+const HOOK_RULE = `Commit hooks always run: never bypass them (--no-verify). A hook fails because of your changes → fix the cause. It fails for a reason outside your changes → a "${TECH}" blocker, the cause in a few French words.`
 
 // ---------------------------------------------------------------- personas
 const PERSONAS = {
@@ -887,7 +887,7 @@ Fix exactly that — the configuration, the setting, the file the project expect
 ${workspaceRule(g, where, branch, from)}${catchUp}
 ${portRule(groupSlot(g.id, round))}${holdLine(locks)}
 ${nudge}${feedback}
-Tests: ${quickTestCommand ? `targeted ones — \`${quickTestCommand}\`, or narrower` : 'run the ones that cover your criteria'}${SUBDIR ? `, from the copy's ${SUBDIR} folder` : ''}.${testCommand ? ` The full suite runs only ${FULL_SUITE_WHEN}: do not run it.` : ''}
+Tests: while you work, run only the tests of what you touch (one file, one test, \`-k\`)${quickTestCommand ? `; \`${quickTestCommand}\` once, just before your commit — never in a loop` : ''}${SUBDIR ? `, from the copy's ${SUBDIR} folder` : ''}.${testCommand ? ` The full suite runs only ${FULL_SUITE_WHEN}: do not run it.` : ''}
 An independent panel judges every criterion on the real result.
 Never run commands that rewrite files outside your criteria (repo-wide formatters, lockfile upgrades). If you need a new dependency, add it the project's usual way and say so in your summary.
 "blocker" stays empty unless you cannot make any progress without the owner changing or clarifying the spec — or, starting with "${TECH}", a technical cause outside your changes stops you (a hook, the environment, a missing tool) — or, starting with "${DEPENDS}" and their ids, other criteria of the spec your criteria build on are missing or broken in your copy.
@@ -1075,7 +1075,7 @@ The integration copy is ${integ.where} (branch ${integ.branch}). Return its path
    - check the list \`git -C ${r.where} diff --cached --name-only ${BASE}\` and drop ${DROP} — with \`git -C ${r.where} restore --staged --source=${BASE} -- <path>\` (drops it even if the developer committed it). Everything else staged is the group's work: keep it.
    - something staged → \`git -C ${r.where} commit -m "spec-first : groupe ${r.group}"\`
 3. Merge it: \`git -C ${integ.where} merge --no-ff --no-edit ${r.branch}\`. Conflict → resolve the markers so this group's criteria and the merged groups' all still hold (read both sides, keep both intents), then \`git add\` and \`git commit --no-edit\`. Never run \`reset\`, \`rebase\`, \`stash\`, \`checkout\` or \`cherry-pick\` in the integration copy: they can wipe groups already merged. Cannot finish the merge → \`git -C ${integ.where} merge --abort\`, so the integration copy stays as it was.
-4. A dependency came in → install it in the integration copy the usual way. Run targeted tests only${quickTestCommand ? ` (\`${quickTestCommand}\`)` : ''} — those covering this group's criteria and the files the merge touched — from ${SUBDIR ? `the copy's ${SUBDIR} folder` : 'the integration copy'}; the full suite runs only ${FULL_SUITE_WHEN}. Fix what the merge broke — only that — and commit the fix. Commit hooks always run, never --no-verify; one fails for a reason outside the merge → the cause in reason (integrated stays true only if the merge commit is on the integration branch).
+4. A dependency came in → install it in the integration copy the usual way. Run targeted tests only${quickTestCommand ? ` (\`${quickTestCommand}\`, once)` : ''} — those covering this group's criteria and the files the merge touched — from ${SUBDIR ? `the copy's ${SUBDIR} folder` : 'the integration copy'}; the full suite runs only ${FULL_SUITE_WHEN}. Fix what the merge broke — only that — and commit the fix. Commit hooks always run, never --no-verify; one fails for a reason outside the merge → the cause in reason (integrated stays true only if the merge commit is on the integration branch).
 5. Merged and committed → remove the group's copy, no longer needed: \`git -C ${ROOT} worktree remove --force ${r.where}\` (refused, e.g. submodules → \`rm -rf ${r.where} && git -C ${ROOT} worktree prune\`), \`git -C ${ROOT} branch -D ${r.branch}\`, then \`rmdir "$(dirname ${r.where})"\`; removed true. Not merged → leave it in place. Leave every other copy and branch alone. Never edit ${ROOT}'s own files or switch its branch. Cannot merge → integrated false and the reason.
 ${portRule(groupSlot(r.group, 12))}${holdLine(locksFor(r.criteria))}
 
@@ -1357,7 +1357,7 @@ ${nudge}${feedbackFor(broken, history, leads)}
 ${changesHint(TARGET)}
 
 Work in the integration copy ${TARGET} (branch ${integ.branch}): every file you edit is under it, never under ${ROOT}. ${hadCopy ? '' : `If it lacks the project's dependencies (never prepared), prepare it first: ${PREPARE} `}When done, commit your changes on that branch. ${HOOK_RULE}
-Fix only what broke. Re-run the reproductions and the targeted tests${quickTestCommand ? ` (\`${quickTestCommand}\`)` : ''}${SUBDIR ? ` from the copy's ${SUBDIR} folder` : ''} before returning; the full suite runs only ${FULL_SUITE_WHEN}.
+Fix only what broke. Re-run the reproductions and the tests of what you touched${quickTestCommand ? `, then \`${quickTestCommand}\` once` : ''}${SUBDIR ? ` from the copy's ${SUBDIR} folder` : ''} before returning; the full suite runs only ${FULL_SUITE_WHEN}.
 ${portRule(FINAL_SLOT + 90 + round)}${holdLine(locksFor(brokenIds))}
 Never run commands that rewrite files outside the broken criteria (repo-wide formatters, lockfile upgrades).
 "blocker" stays empty unless you cannot make any progress without the owner changing or clarifying the spec — or, starting with "${TECH}", a technical cause outside your changes stops you — or, starting with "${DEPENDS}" and their ids, other criteria the broken ones build on are missing or broken.

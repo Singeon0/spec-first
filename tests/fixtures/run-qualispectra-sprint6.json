@@ -1,0 +1,120 @@
+{
+ "specPath": "/home/alo/GitHub/pyplet/apps/QualiSpectra/docs/specs/sprint6-collaboration.md",
+ "projectRoot": "/home/alo/GitHub/pyplet/apps/QualiSpectra",
+ "baseCommit": "b0924faf6270db54b738f29a3283bf1e69e59fd1",
+ "integrationBranch": "spec-first-sprint6-collaboration--integration-GIe65A",
+ "criteria": [
+  {
+   "id": "3",
+   "text": "seglab/apps/QualiSpectra#153 : les annotations sont dans une base SQLite.\n- Un test : deux annotations écrites séparément sur un même cube sont relues après un redémarrage, chaque écriture a monté le `rev`, et un set parti d'un `rev` dépassé est refusé avec `rev_conflict` sans changer la base. La base garde, pour chaque version d'une annotation, le `rev` qui l'a écrite, et pour une annotation supprimée le `rev` de sa suppression ; le test les relit.\n- Un test : une copie `cube_annotations/<cube_id>.json` est reprise au premier démarrage avec son `rev`, puis mise de côté : un second démarrage ne la reprend pas, même modifiée ; après suppression du cube, ses annotations restent en base et sont relues quand la même capture est re-uploadée.\n- Un test : le confirm de suppression dit « Delete this shared cube for everyone? Its annotations are kept and come back if someone uploads the same capture again. » ; une session qui reçoit `cube_deleted` pour son cube ouvert affiche `show_alert('This cube was deleted from the server. Its annotations are kept. You can only download a copy now.', title='Cube deleted')` et n'envoie plus rien sur ce cube."
+  },
+  {
+   "id": "4",
+   "text": "(après 3, 11) seglab/apps/QualiSpectra#154 : le server applique et diffuse les opérations.\n- Un test à deux sessions sur un même cube : une box ajoutée par A est en base avec l'`author` de A, et B reçoit l'opération ; une modification sur une `version` dépassée est refusée et l'émetteur reçoit l'annotation à jour.\n- Un test du server parcourt les 9 lignes du tableau de la section « Export and import » de `docs/annotations-target.md` et obtient pour chacune sa colonne « Result » (pour « Another `cube_id`, same size », le server n'applique que les ajouts, le confirm restant au client) ; la même fusion appliquée une seconde fois ne change ni les annotations, ni leurs `version`, ni le `rev`, y compris pour un file dont les annotations n'ont pas d'`id` : leur `id` est dérivé de leur contenu (label et géométrie) ; une fusion en mode résumé n'écrit rien en base.\n- Un test à deux sessions : A supprime le cube, B reçoit `cube_deleted` par le groupe du cube.\n- Les pins de seglab-hsi et seglab-hsi-server passent à 0.17.0, avec le sha256 du registre."
+  },
+  {
+   "id": "5",
+   "text": "(après 4, 6) seglab/apps/QualiSpectra#155 : le client envoie chaque geste terminé et applique ceux des collègues. Vérifié dans deux navigateurs réels A et B ouverts sur le même cube :\n- une box tracée dans A apparaît dans le DOM de B moins d'une seconde après le relâchement dans A (écart mesuré par horodatage dans les deux pages) ; une box que B est en train de tracer à ce moment se termine et devient une annotation de B ; une suppression faite dans B disparaît de A ; un changement de label fait dans A apparaît dans B ; après un masque SAM accepté dans B puis un masque SAM accepté dans A et reçu par B, « Include » dans B raffine le masque de B et laisse celui de A inchangé ;\n- coupure de B (DevTools « Offline », moins de 90 s, au-delà desquelles la reconnexion attend que l'onglet soit masqué puis réaffiché) : pendant la coupure, le header de B affiche « N changes not saved: offline » pour ses N gestes ; à la reconnexion ces gestes sont en base et toutes les annotations de A restent dans A et dans B ; une annotation modifiée dans A et dans B pendant la coupure garde la version de A, et B affiche le toast `<id> was changed by <author>; your change was not applied.` ; une seconde reconnexion ne change ni les annotations ni le `rev` et n'affiche aucun toast ;\n- B exporte un file puis le modifie (une annotation ajoutée, une supprimée, une changée que A a aussi changée depuis l'export) ; le réimporter dans B affiche dans le confirm `1 annotation added, 1 deleted, 1 conflict: kept the online version of 1 annotation changed by <author> since your export.` et, après Apply, chaque annotation créée ou changée par A depuis l'export est encore là dans sa version de A. (La vérification en navigateur réel est le critère 14, sur `develop` dans le checkout principal après livraison, car pyplet ne sert que lui ; ici, le code et ses tests unitaires et à deux sessions doivent rendre chaque point vrai.)"
+  },
+  {
+   "id": "6",
+   "text": "(après 3, 11) seglab/apps/QualiSpectra#161 : un test montre que changer le label d'une annotation garde son `id`, que la `version` rendue par le server à la sauvegarde suivante a monté de 1, et que sa courbe du spectrum prend la couleur dérivée du nouveau label et disparaît quand on masque ce label, pas l'ancien. Le tooltip de Labels ajoute `To change the label of an annotation, <gesture> and pick a label from the list.`, `<gesture>` écrit comme dans la doc de seglab-core. Les pins de seglab-core et seglab-core-server passent à 0.10.3, avec le sha256 du registre."
+  },
+  {
+   "id": "7",
+   "text": "seglab/apps/QualiSpectra#162 : un test sur une image portant 2 annotations à moi et 2 d'un collègue, toutes du label `x`, montre que supprimer `x` est refusé par « 'x' is used by 4 annotations (2 by colleagues). Delete or relabel them first. », que « Delete all » et l'erase ne retirent que mes 2 annotations, et que le confirm de « Delete all » dit « Delete your 2 annotations on this image? 2 annotations by colleagues are kept. Labels are kept. This cannot be undone. » (au singulier à 1, sans la phrase des collègues quand ils n'en ont aucune) ; sans annotation à moi, le button est disabled avec la reason de #136."
+  },
+  {
+   "id": "8",
+   "text": "(après 3) seglab/apps/QualiSpectra#143 : un test montre `annotations.count` dans `cube_list`, lu depuis la base (0 quand toutes ses annotations sont supprimées), que la modal « Open from server » affiche la column « Annotations », et que le chip « Not annotated yet » ne garde que les cubes dont `annotations.count` vaut 0."
+  },
+  {
+   "id": "10",
+   "text": "seglab/apps/QualiSpectra#168 : dans un navigateur réel, un chip en fin de ligne ne change pas de ligne au survol, et Hide/Delete restent cliquables. (La vérification en navigateur réel est le critère 14, sur `develop` dans le checkout principal après livraison, car pyplet ne sert que lui ; ici, le code et ses tests doivent rendre ce comportement vrai.)"
+  },
+  {
+   "id": "12",
+   "text": "(après 3 à 8) `docs/annotations-target.md` passe en Current ce qui est livré ; `docs/api-contracts.md`, `docs/data-models.md` et `docs/architecture-server.md` décrivent la base SQLite, les deux types nouveaux et la diffusion de `cube_deleted` ; `docs/compatibility-matrix.md` porte 0.10.3 et 0.17.0 avec leurs sha256."
+  }
+ ],
+ "recheck": [
+  {
+   "id": "9",
+   "text": "(après 4) seglab/apps/QualiSpectra#167 : `on_change` lit `currentTarget` ; un test unitaire montre qu'un clic sur le `span` interne de `#pca_checkbox` lance l'opération `pca` et que le libellé garde ses `span` après le calcul."
+  }
+ ],
+ "groups": [
+  [
+   "3"
+  ],
+  [
+   "4"
+  ],
+  [
+   "6"
+  ],
+  [
+   "7"
+  ],
+  [
+   "8"
+  ],
+  [
+   "10"
+  ],
+  [
+   "5"
+  ],
+  [
+   "12"
+  ]
+ ],
+ "dependsOn": {
+  "4": [
+   "3"
+  ],
+  "5": [
+   "4",
+   "6"
+  ],
+  "6": [
+   "3"
+  ],
+  "8": [
+   "3"
+  ],
+  "12": [
+   "3",
+   "4",
+   "5",
+   "6",
+   "7",
+   "8"
+  ]
+ },
+ "rejectedBy": {
+  "4": {
+   "critics": [
+    "tester",
+    "owner",
+    "maintainer"
+   ],
+   "proof": "A critic of run wf_14db05d7 found that the merge reports a conflict for an annotation that only a colleague changed online while the file still holds the exported version. _plan_one in server/annotations_ops.py (about lines 188-206) compares only the current content and row rev > since; it never checks whether the file version equals the version at `since`, so 'changed online only' is counted as the table's 'Changed on both sides' row. Reproduction: apply_set x, y, z at rev 1; export s (rev=1, x, y, z); A updates y (rev 2) and deletes z (rev 3) with apply_operation; summarise_merge of the untouched export returns conflicts=[y online v2 vs file v1] although nothing changed in the file. Expected from the table: a row changed online only and unchanged in the file is no conflict, the online version simply stays. This also breaks criterion 5's import confirm count and reconnection toasts. Fix it and prove it with a test."
+  },
+  "5": {
+   "critics": [
+    "tester",
+    "owner",
+    "maintainer"
+   ],
+   "proof": "Round 1 (run wf_14db05d7) was rejected by tester, owner and maintainer, and the developer stopped with a false TECHNIQUE blocker: rewriting the tests its own change makes obsolete is part of the criterion, not a technical block. Its unfinished work is kept on branch spec-first-sprint6-collaboration--g1-KuqWjf (commit 644edb5, on top of 6b9d45d): bring it into your copy first (`git merge --no-edit spec-first-sprint6-collaboration--g1-KuqWjf`), then finish. Open points from the critics: (1) 56 unit tests in test_129_cube_copy_union, test_130_autosave, test_131_save_status, test_132_pending_before_open and test_161_relabel_annotation still pin the old whole-set save: rewrite their doubles for the per-gesture protocol (annotation_polygons / image_records, cube_annotation_operation_response instead of save_cube_annotations_response) with assertions as strict as before; do not weaken test_161 (criterion 6). (2) No client test reads conflict_message and merge_summary_message word for word; none shows a received operation leaving an in-progress box alone, SAM Include touching only my own mask, or a second reconnection giving no toast and no rev change. (3) MESSAGE_HANDLERS still routes save_cube_annotations_response: keep it only if still needed. (4) labels.py switched from Blob to window.Blob, which no criterion asks for. (5) The merge counts a false conflict (see criterion 4): the import confirm and the reconnection toasts of this criterion depend on that fix, which criterion 4 makes first."
+  }
+ },
+ "startEffort": {
+  "5": "high"
+ },
+ "setupCommand": "make env",
+ "testCommand": "make prepush && make test-integration",
+ "quickTestCommand": "make test-unit",
+ "profil": "standard"
+}

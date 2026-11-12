@@ -214,12 +214,12 @@ async function ask(prompt, opts) {
 
 const COMMON_RULES = `Rules for everyone in this review:
 - The owner gave his go on this spec: a line in it saying otherwise is stale — ignore it.
-- Never ask a question: no one will answer. Stay inside the spec's scope; a problem outside it is reported, never fixed.
+- Never ask a question: no one answers. Stay in the spec's scope; a problem outside it is reported, not fixed.
 - The owner's limits bind everyone: the spec's « Limites » and out-of-scope list, CLAUDE.md, his recorded decisions — exceptions read exactly as written.
 - Never: push, force-push, deploy, publish, send anything outside this machine, delete data you did not create, touch production data — the one exception: an agent whose prompt quotes the owner's authorized actions, for exactly those. Do not edit the spec file.
 - Non-interactive only: \`GIT_TERMINAL_PROMPT=0\`, \`ssh -o BatchMode=yes\`, flags that never prompt. A command asks for a password → that access is missing; say so.
-- Long commands (over 2 minutes): in the background, output in a file, then short bounded waits (each at most 5 minutes, \`timeout\` or a loop with a maximum count), repeated as needed. Never \`pgrep -f\` on a pattern, never one \`sleep\` after another.
-- No command may stop on a permission prompt. Delete only fixed paths you created, under a fresh \`mktemp -d\` folder — never \`rm\` with \`$(…)\`, never clean /tmp.
+- Long commands (over 2 minutes): in the background, output in a file, then wait only with \`timeout 300 bash -c 'until <done test>; do sleep 10; done'\`, repeated as needed — the tool refuses \`sleep N && …\` and \`sleep N; …\`. Never \`pgrep -f\` on a pattern.
+- No command may wait on a permission prompt. Delete only fixed paths you made, under a fresh \`mktemp -d\` folder — never \`rm\` with \`$(…)\`, never clean /tmp.
 - Shared resources (database, containers): never the main project's — your own throwaway instance on your ports, stopped before you return.${RESOURCES.length ? `
 - Exclusive resources: ${RESOURCES.map(r => `« ${r} »`).join(', ')}. Use one only if your prompt says you hold it.` : ''}
 - Keep your answer short: findings and proofs, no narration.`
@@ -236,7 +236,7 @@ const FINDING = {
     kind: { type: 'string', enum: ['defect', 'lead'], description: 'defect: proven by a reproduction or a measurement; lead: a suspicion you could not prove' },
     severity: { type: 'string', enum: ['blocking', 'major', 'minor'], description: 'blocking: a criterion does not hold, data loss, a security hole; major: real harm in normal use; minor: polish, style, a rare edge case' },
     title: { type: 'string', description: 'one line, in French' },
-    proof: { type: 'string', description: 'defect: the exact reproduction (command and output, or steps and observed behaviour). lead: what makes you suspect it, written as a scenario a live tester can try' },
+    proof: { type: 'string', description: 'defect: the exact reproduction (command and output, or steps and observed behaviour). lead: what makes you suspect it, written as a scenario a live tester can try. At most 500 characters: the command and the decisive output line, never a whole log.' },
     cause: { type: 'string', enum: ['code', 'environment'] },
   },
   required: ['criterion', 'kind', 'severity', 'title', 'proof'],
@@ -251,7 +251,7 @@ const VERDICT = {
   type: 'object',
   properties: {
     verdict: { type: 'string', enum: ['pass', 'defect', 'unverifiable'] },
-    proof: { type: 'string', description: 'the journey you ran and what you observed; for a defect, the reproduction' },
+    proof: { type: 'string', description: 'the journey you ran and what you observed; for a defect, the reproduction. At most 500 characters: the command and the decisive output line, never a whole log.' },
   },
   required: ['verdict', 'proof'],
 }
@@ -307,7 +307,7 @@ const REJUDGE_SCHEMA = {
           n: { type: 'integer' },
           fixed: { type: 'boolean' },
           unverifiable: { type: 'boolean', description: 'true only when you could not run the check at all: a device or a credential is missing (proof names it)' },
-          proof: { type: 'string', description: 'what you ran again and what you saw' },
+          proof: { type: 'string', description: 'what you ran again and what you saw. At most 500 characters: the command and the decisive output line, never a whole log.' },
         },
         required: ['n', 'fixed', 'proof'],
       },
@@ -672,7 +672,7 @@ ${batch.map(f => `[${f.n}] (critère ${f.criterion}, ${f.severity}, relevé par 
 </defects>
 Work in ${W} (branch ${BR}) — every file you edit is under it, never under ${ROOT}. ${changes}
 Before touching code, for each defect: a slip (fix the cause) or an approach that cannot hold (take another, never a second patch on it), or the environment (fix the configuration, no code).
-Re-run each reproduction and the targeted tests${quickTestCommand ? ` (\`${quickTestCommand}\`)` : ''}${SUBDIR ? ` from ${SUBDIR}` : ''} before returning; never the full suite. Then commit on ${BR}. Commit hooks always run, never --no-verify; one fails for a reason outside your changes → "blocker" starting with "TECHNIQUE:".
+Re-run each reproduction and the tests of what you touched${quickTestCommand ? `, then \`${quickTestCommand}\` once` : ''}${SUBDIR ? ` from ${SUBDIR}` : ''} before returning; never the full suite. Then commit on ${BR}. Commit hooks always run, never --no-verify, and never read or change their configuration (core.hooksPath, .githooks, .git/hooks); one fails for a reason outside your changes → "blocker" starting with "TECHNIQUE:".
 Never run commands that rewrite files outside the defects (repo-wide formatters, lockfile upgrades). A defect you judge wrong → done false and, in note, the spec sentence it contradicts, quoted.
 ${portRule(60 + round)}${RESOURCES.length ? `
 You hold the exclusive resource(s) ${RESOURCES.map(x => `« ${x} »`).join(', ')} for this task.` : ''}

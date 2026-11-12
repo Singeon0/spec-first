@@ -7,7 +7,7 @@ Ce banc vérifie, à chaque version du plugin, qu'un orchestrateur qui lit SKILL
 - `preambule.md` : le début de consigne, commun à toutes les situations.
 - `NN-*.md` : une situation par fichier — la consigne, le contexte fourni, les points vérifiables (A1, A2…), les erreurs typiques et, pour la 1.7.0, les lignes du SKILL concernées.
 - `resultats-1.7.0.md` : les notes de la 1.7.0, point de départ des comparaisons.
-- `resultats-1.8.0.md` : les notes de la 1.8.0 (27 situations).
+- `resultats-1.8.0.md` : les notes de la 1.8.0 (27 situations ; la 28 date de la 1.10.0).
 - `resultats-1.9.0.md` : les notes de la 1.9.0, avant et après corrections.
 
 Modifié le 07/11/2026 (1.9.0, D15) : les grilles et les consignes parlent de la revue (spec-first:review) au lieu du contrôle strict ; chaque situation modifiée porte une ligne « Modifié le 07/11/2026 » sous « Décisions en jeu ».

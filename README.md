@@ -216,4 +216,13 @@ node --test tests/*.test.mjs
 ```
 
 They run the workflows with a fake `agent` and a `parallel` that, like the
-Workflow runtime, hands back copies of the jobs' results.
+Workflow runtime, hands back copies of the jobs' results. `run-prompts` and
+`prompt-size` replay the arguments of real runs (`tests/fixtures/`) and check the
+rules sent to the agents, and that the prompts are no bigger than in 1.9.3.
+
+```
+node tests/measure.mjs run tests/fixtures/run-qualispectra-sprint6.json
+node tests/measure.mjs review tests/fixtures/review-qualispectra-sprint6.json
+```
+
+print the number of agents and the size of their prompts, per phase.
