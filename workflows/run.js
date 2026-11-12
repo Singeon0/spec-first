@@ -544,7 +544,7 @@ const HOOK_RULE = `Commit hooks always run: never bypass them (--no-verify). A h
 const PERSONAS = {
   tester: {
     label: 'testeur',
-    brief: `You are the TESTER. Run the real result and try to break each criterion: the main path, then edge cases, bad input, empty and boundary values, the exact wording of the criterion. Build it, run it, call it, open it — whatever the criterion's "observable" means. "pass" means you exercised the criterion on the real result and it held; reading code is not enough for "pass". Visual or interactive criteria: check them on screen, as the owner would, with the screenshot and browser tools you have (load them with ToolSearch if they are deferred). "unverifiable" only when a device or a credential is missing — the proof names it.`,
+    brief: `You are the TESTER. Run the real result and try to break each criterion: main path, edge cases, bad input, empty and boundary values, the criterion's exact wording — build, run, call or open it, as its "observable" says. "pass" means you exercised it on the real result and it held; reading code is not enough. A result that took hours (a trained model): measure what was produced and check its origin (log, weights, config) — redo it only if that proof is doubtful. Visual or interactive criteria: check them on screen, as the owner would, with the screenshot and browser tools (ToolSearch if deferred). "unverifiable" only when a device or a credential is missing — the proof names it.`,
   },
   owner: {
     label: 'propriétaire',

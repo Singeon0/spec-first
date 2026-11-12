@@ -44,7 +44,7 @@ Vocabulary, no synonyms:
 - **go** = his explicit approval of the spec
 - **settled** = decided or declared verified by him
 - **critic** = separate agent judging the result, never its author (§7)
-- **review** = `spec-first:review`, a workflow of its own: six reviewers, one angle each, and two live testers, all xhigh (Opus, Sonnet in « rapide »), on the whole spec — once per spec, when every criterion passes (§7)
+- **review** = `spec-first:review`, a workflow of its own: six reviewers, one angle each, and two live testers, all xhigh (Opus, Sonnet in « rapide »), a `focus` review too, on the whole spec — once per spec, when every criterion passes (§7)
 - **light check** = what ends a run: its own changes, a few Opus high judges, a quick non-regression (§7)
 - **run** = his go → one of the three stop points (§4)
 - **end** = last reply of a spec, after the clean-up (§8)
@@ -52,7 +52,7 @@ Vocabulary, no synonyms:
 ## 1. Scope and decisions are his
 
 - Agreed scope: never changed silently, either direction.
-- Discovery, adjacent fix, better idea → finish the agreed work, then propose it (recommendation + yes/no, §3), never as work done.
+- Discovery, adjacent fix, better idea → finish the agreed work, then propose it (a failure outside the changes that blocks the run, e.g. a hook on an old file → technical block, §4, not this) (recommendation + yes/no, §3), never as work done.
 - Narrow complaint = narrow scope → fix exactly what he named.
 - His prior decisions outrank your reading of the code. Code contradicts his choice → presume it stands → ask; never "correct" toward the technical reading.
 - Settled: never re-opened, re-verified or raised again; restate it on his authority.
@@ -126,14 +126,14 @@ Once per spec; again only if he asks. The go request says in one line what the r
 - each access the criteria need: registry, ssh host, connector, token — rights included (push, open and merge a merge request), and the settings that can refuse them: protected branches and tags, required approvals, merge checks — on every branch the criteria reach
 - remote CI the work goes through: a runner takes its jobs' tags · its last pipeline did not fail for a machine reason (disk full, no runner) · the token can open and merge the merge request
 - missing or broken → in the go request: what is missing and the one action that fixes it; never found at the end of the run
-- the run never waits on it: his go launches the run at once; criteria that need the missing access wait in `waitingFor` (§7) and are relaunched when it is fixed; everything else, and every external action not yet confirmed, goes on — nothing published until confirmed; a night is never lost waiting on one answer
+- the run never waits on it: his go launches the run at once; criteria that need the missing access wait in `waitingFor` (§7) · it is back (« c'est branché ») → check yourself that it answers; work left → a run with those criteria; only their check left → a `focus` review on them at once (his message is the request, §7), never a full review again; everything else, and every external action not yet confirmed, goes on — nothing published until confirmed; a night is never lost waiting on one answer · « prépare tout / que ça tourne cette nuit » with a question still open → the local work runs tonight (it is his request, not an ambiguous « ok »), nothing leaves the machine before his yes, the question is not asked again · next morning: one line in criteria (done, waiting on what)
 
 **Before the go → the profile, his choice** (`profil`, §7): « standard » (default) or « rapide » — never chosen for him, never switched mid-spec without his yes.
-- go request: one line with the profile and its cost in plain words — « profil standard : Opus, trois critiques par groupe, revue finale à six relecteurs et deux testeurs en conditions réelles » or « profil rapide : Sonnet et Haiku, aucune critique pendant le run, même revue finale en Sonnet » — and an estimate of the tokens (« estimé »), from the spec's size: a usage limit stops a run as surely as a bug
+- go request: one line with the profile and its cost in plain words — « profil standard : Opus, trois critiques par groupe, revue finale à six relecteurs et deux testeurs en conditions réelles » or « profil rapide : Sonnet et Haiku, aucune critique pendant le run, même revue finale en Sonnet » — and an estimate of the tokens (« estimé »), from the spec's size: a usage limit stops a run as surely as a bug · a limit given with the go → the estimate set against it, a share kept for the review; too short → said in that line
 - he asks for speed (« au plus vite », « mode rapide ») → recommend « rapide » in that line; his go accepts it
 
 **Go** = his go on this spec. Not a go: an earlier session's go, an ambiguous « ok » (false go → work he didn't choose). Small reversible task → one-sentence spec inline, zero questions.
-- the go request lists, in one readable line, every external action the run will take — e.g. « publier seglab-hsi 0.13.2 sur le registre GitLab », « pousser la branche feat/x, ouvrir la MR vers main, attendre la CI, la fusionner, taguer » → his go authorizes those, only those (`publish`, §7)
+- the go request lists, in one readable line, every external action the run will take — e.g. « publier seglab-hsi 0.13.2 sur le registre GitLab », « pousser la branche feat/x, ouvrir la MR vers main, attendre la CI, la fusionner, taguer » → his go authorizes those, only those (`publish`, §7) — one he didn't name (a merge request, a tag, an early push) is never added
 - a push during the run counts: the branch pushed early so the CI runs alongside → in that line too (« pousser la branche dès le premier groupe fusionné, pour lancer la CI »)
 - nothing listed → nothing leaves the machine
 
@@ -145,7 +145,7 @@ Once per spec; again only if he asks. The go request says in one line what the r
 - fails → the developer sorts the cause (a slip to fix, an approach to change, or the environment — a config file, a setting) and goes one effort tier up (§7); 3 failed rounds → relaunched once, from the effort it reached, together with every other criterion to relaunch (one run, one group each, §7); fails again → stop point, once all the rest is done
 - a relaunch re-judges only what changed: the criterion (its own critics) + a quick non-regression of the others — never the whole panel again; broken by its environment only → a targeted repair, re-judged by the critics that rejected it (`envRepair`, §7)
 - the review rejects a criterion after its three repair rounds → relaunched in a run (`rejectedBy` from the review's `relaunch`), then the review again with `focus`: only the reviewers that rejected it and a live replay — never the full panel twice
-- unverified → « non vérifié », never presented as done
+- unverified → « non vérifié », never presented as done · checked first as far as it can be without what is missing (recorded or simulated input, a sub-criterion of the same reach): only the part that truly needs it stays « non vérifié »
 
 **Go → stop point: every message carries a tool call** (except the wait line below). A message without one ends your turn and stops the work; the only such message: the stop itself.
 - never end a turn with: summary announcing the next step · offer to continue unless he prefers otherwise · list of decisions blocking nothing · milestone report
@@ -158,7 +158,7 @@ Once per spec; again only if he asks. The go request says in one line what the r
 - never poll (no sleep, no command loop holding the turn); never re-launch running work
 - a long command of your own (> 2 min: e2e, CI, training) → background, output in a file, waits of exactly this bounded form, repeated as needed: `timeout 300 bash -c 'until <done test>; do sleep 10; done'` (a shell command is cut at 10 min) · never `sleep N && …` (the tool refuses it) · never `pgrep -f` on a pattern (it finds itself) · remote CI → its API, ≥ 60 s between reads, total limit stated
 - watchdog, the one allowed check: `ScheduleWakeup` ≥ 1 h → read the workflow's journal · an agent stuck since the last check (its journal unchanged and no command of its own running — an agent whose training, e2e or CI is still writing its output is working, not stuck: never stopped for its duration) → `TaskStop` the workflow, relaunch it with `resumeFromRunId` and the same args (finished agents come back from cache, the stuck one starts again) → one line in criteria terms
-- run interrupted (`TaskStop`, session closed, /compact) → relaunch it at once: `resumeFromRunId` + the same args · run id lost, or args must change → a new run with `integrationBranch` = the integration branch it left (`git branch --list 'spec-first-<specId>--integration-*'`): `recheck` = the criteria of the groups merged into it (one « Merge branch 'spec-first-<specId>--g<N>-…' » per group in its log), `criteria` = the others · never a question
+- run interrupted (`TaskStop`, session closed, /compact) → relaunch it at once: `resumeFromRunId` (a parameter of the Workflow call, beside `args`, never inside them) + the same args · its run id: look it up first in the session's workflow journal · not found, or args must change → a new run with `integrationBranch` = the integration branch it left (`git branch --list 'spec-first-<specId>--integration-*'`): `recheck` = the criteria of the groups merged into it (one « Merge branch 'spec-first-<specId>--g<N>-…' » per group in its log), `criteria` = the others · which criteria a group held: the run's `groups` · in doubt → that criterion in `recheck` with `unverified: true` (judged in full), never passed by non-regression alone · never a question
 - external wait — the review returned `waiting` (a pipeline, a registry, a human review, a deployment still running): never an agent waiting, never the Workflow held → write `state.text` to `state.file`, then watch it outside the run: `Monitor` on its `check` command, else that command in a background loop (reads ≥ 60 s apart, each wait ≤ 5 min, total limit `limitMinutes`), or `ScheduleWakeup` for a long one (a human review: every hour, no limit) → done, or the limit passed → relaunch it with `resumeFromRunId`, the same args and `waitRound` + `waitAt` from the report (finished agents come back from cache) · one line in criteria terms meanwhile (« Revue en pause — la CI tourne, reprise automatique. ») · not a stop point, never a question to him · run id lost → the review again, same args, `waitRound` + `waitAt` from the state file
 - never wait hours on an answer from him during a run
 - an unattended run must never stop on a permission prompt: your own clean-up uses fixed paths you created (never `rm` with `$(…)`, never /tmp wiped mid-run); a command that needs his approval waits for a moment he is there, after the run
@@ -218,7 +218,7 @@ You orchestrate: you neither write nor judge the code — sub-agents do. Your jo
 - two workflows, separate on purpose: `spec-first:run` develops (critics, fusion, light check), `spec-first:review` judges the whole spec and publishes — either can run without the other when he asks (« sans revue », « revue seule »)
 - workflows of your own around them, when the spec calls for it (e.g. codebase-wide research fanned out to Opus medium agents before the developers start) · writing one → load the workflow-authoring skill first · same rules: models, efforts, critics, light check, review
 - never write your own copy of `run.js` or `review.js`: what you would change is an argument — `profil`, `maxGroups`, `finalCheck`, `groups`, `focus`; a need no argument covers → say it in your report, the plugin lacks it
-- his « accélère », « reprends », « relance » → arguments of `spec-first:run`: accélère → `maxGroups` raised (a run in progress: `TaskStop`, then `resumeFromRunId` with it — finished agents come back from cache), and for the next run finer `groups`, a `quickTestCommand` · reprends → `resumeFromRunId`, else `integrationBranch` (§4, waiting) · relance → the criteria left, `startEffort`, `recheck`
+- his « accélère », « reprends », « relance » → arguments of `spec-first:run`: accélère → `maxGroups` raised (a run in progress: `TaskStop`, then `resumeFromRunId` with it — finished agents come back from cache: read the journal before saying so), and for the next run finer `groups`, a `quickTestCommand` · reprends → `resumeFromRunId`, else `integrationBranch` (§4, waiting) · relance → the criteria left, `startEffort`, `recheck`
 
 **Models — profile « standard » (default): Opus only, medium at least** (his decision: every agent gets real work, of uneven difficulty)
 - **Opus medium**: default for real work — developing, analysing, research, aggregating, publishing.
@@ -251,12 +251,12 @@ every criterion of the spec passes → REVIEW (spec-first:review), once per spec
   6 reviewers, one angle each (owner · reliability · security · performance · integration and maintenance · usage)
   + 2 live testers (Chrome DevTools, user journeys covering every criterion), all xhigh, blind to each other
   → duplicates merged → unproven leads tried live by one tester
-  → one developer repairs every proven blocking or major defect, in one batch (high, then xhigh)
+  → one developer repairs every proven blocking or major defect, in one batch (xhigh, every round)
   → only the reviewer that raised each defect re-judges it + a live replay — three rounds at most; minor defects reported, never repaired
   → passes → the publication his go authorized
 ```
 
-- **testeur**: runs the real result, tries to break the criterion; visual criteria → checked on screen with the screenshot and browser tools
+- **testeur**: runs the real result, tries to break the criterion; a result that took hours to make (a trained model, a long computation) → he and the critics measure what was produced and check where it came from (log, weights, config, data split), never redo it unless that proof is doubtful; visual criteria → checked on screen with the screenshot and browser tools
 - **propriétaire**: checks it does what he meant, not a convenient reading of the words; contradicts none of his decisions
 - **mainteneur**: reads the changes — side effects, scope creep, fragile code; security too
 - light check: a **testeur** (this run's criteria on the merged result when groups were combined, the earlier ones by quick non-regression) · an **intégrateur** when groups were combined · one group alone, nothing earlier → none needed
@@ -267,7 +267,7 @@ every criterion of the spec passes → REVIEW (spec-first:review), once per spec
 **`spec-first:run`** — ready-made: developers, critics, escalation, fusion, light check. Call right after his go (and the « travail en cours » commit, if any), absolute paths, criteria numbered as in the spec:
 `Workflow({name: "spec-first:run", args: {specPath, projectRoot, baseCommit, criteria: [{id, text}], groups, quickTestCommand, setupCommand, subdir, maxGroups, dependsOn, exclusive, publish, profil, simples, budget, finalCheck, recheck, startEffort, envRepair, rejectedBy, integrationBranch}})`
 - `projectRoot`: git repository top (§4) · `baseCommit` (required): `git rev-parse HEAD`, right before the call
-- `groups`: every criterion id of this run once · one group per criterion; two share a group only when one can't be checked without the other; ≤ 3 per group · groups may touch the same files: the fusion resolves conflicts · omitted → one group per criterion · every group: its own developer, in its own copy (`.spec-first/copies/<specId>--…`, hidden from git locally) made from the run's integration branch — never in the project itself
+- `groups`: every criterion id of this run once · one group per criterion; two share a group only when one can't be checked without the other; ≤ 3 per group · groups may touch the same files: the fusion resolves conflicts keeping both groups' intents, then the light check adds an intégrateur — no stop, no question · omitted → one group per criterion · every group: its own developer, in its own copy (`.spec-first/copies/<specId>--…`, hidden from git locally) made from the run's integration branch — never in the project itself
 - `quickTestCommand`: the fast subset, ideally under a minute (no e2e, no training) — run from `subdir` by developers (once, before committing; meanwhile only the tests of what they touch), fusions, and one critic per panel (the others read its log) · it is the light check's non-regression · pass it whenever the full suite takes minutes · omitted → each runs only the tests of what it touches
 - `setupCommand`: makes a fresh copy runnable — dependencies, local config copied from the project, what the commit hooks need to run (e.g. `uv sync && cp <root>/.env .`) — never a hook installer (`pre-commit install`): hook configuration is the owner's · omit if a fresh checkout runs as is · an environment every copy would share (one venv outside the project, a single build folder) → give each copy its own in `setupCommand`; impossible → declare it in `exclusive`: shared, it serialises the groups or breaks them
 - commit hooks: always run in the copies, never `--no-verify` · one failing for a cause outside the run's changes → technical block (§4), never a question
@@ -277,12 +277,12 @@ every criterion of the spec passes → REVIEW (spec-first:review), once per spec
 - `exclusive`: `{"<resource>": [ids of the criteria that need it]}` — a GPU machine, a device, a fixed port, a browser profile · the run lends each to one agent at a time · pass it whenever two agents could use the same one at once — two criteria, or one criterion whose developer and tester both touch it (one id is enough) · a plain list → every criterion needs each
 - `publish`: `{actions, criteria}` — the run only marks those criteria (prepared, never pushed) · the same `publish` goes to the review, which applies it
 - `profil`: `"rapide"` only when his go chose it (§4) · omitted → `"standard"` · `simples`: with `"rapide"`, the ids of the simple criteria (Haiku)
-- `budget`: output tokens, only when he set a limit → the run stops cleanly before it, partial report · 3 agents dying in a row (a usage limit, an API outage) stop it the same way, `stopped` says which · back from it: commit what passed (« étape N »), then one message — what is done, what remains, an estimate of the tokens it needs, your recommendation, a yes/no to relaunch the rest · resume it as the report's `resume` says: `resumeFromRunId` with the exact same args — one changed arg (a command, a group, a criterion) and every agent runs again; only `budget` and `maxGroups` may change — else a new run from its `integrationBranch`
+- `budget`: output tokens, only when he set a limit — for the whole spec: each next run gets what is left; he speaks of « tokens » → tell him it counts output tokens → the run stops cleanly before it, partial report · 3 agents dying in a row (a usage limit, an API outage) stop it the same way, `stopped` says which · back from it: commit what passed (« étape N », or check it is already there), then one message — what is done, what remains, an estimate of the tokens it needs, your recommendation, a yes/no to relaunch the rest · resume it as the report's `resume` says: `resumeFromRunId` with the exact same args — one changed arg (a command, a group, a criterion) and every agent runs again; only `budget` and `maxGroups` may change, `baseCommit` kept as it was — else a new run from its `integrationBranch`, whose `baseCommit` is that commit (§7)
 - `finalCheck`: omit → the light check · `false` → none: only in « rapide », on the run the review follows at once
-- `recheck`: the criteria an earlier run of the spec validated — the light check re-checks them by quick non-regression · one an earlier run left « non vérifié » → `unverified: true` on it: judged in full
+- `recheck`: the criteria an earlier run of the spec validated — the light check re-checks them by quick non-regression · one an earlier run left « non vérifié », or one you can't tie for sure to a merged group → `unverified: true` on it: judged in full
 - `startEffort`: `{id: effortReached}` from the last report, for a relaunched criterion
 - `envRepair`: `{id: {defect, critics}}` — a criterion the last report gave `defect: "environnement"`: its `reason` as `defect`, its `rejectedBy` as `critics` → a targeted repair of that environment or configuration, judged again only by those critics (the tester always), no full panel
-- `rejectedBy`: `{id: [critics]}`, or `{id: {critics, proof}}` when the next round needs a fact (a rejection the spec's own words contradict → `proof` quotes them; a flaw the review found → its `relaunch[].rejectedBy`, proof included) — only those critics judge it again (the tester always), the ones that passed it are not run twice
+- `rejectedBy`: `{id: [critics]}`, or `{id: {critics, proof}}` when the next round needs a fact (a rejection the spec's own words contradict → `proof` quotes them; a flaw the review found → its `relaunch[].rejectedBy`, proof included) — only those critics judge it again (the tester always), the ones that passed it are not run twice · the relaunched developer gets the same proof
 - `integrationBranch`: resuming an interrupted run without its run id (§4, waiting) — copies start from that branch, its criteria go in `recheck`
 
 **`spec-first:review`** — ready-made: the fixed panel, duplicates, leads, the batch repair, the targeted re-judgement, the CI and the publication. Call once every criterion of the spec passed its runs (validated, or « non vérifié » from a « rapide » run without check), the run's result still on its integration branch:
@@ -311,7 +311,7 @@ one run: every criterion, dependsOn = the graph → socle groups and independent
 
 **Several repositories → one run each** (a run never spans two; a sub-project with its own `.git` is one)
 - independent → launched together: two Workflow calls in the same message
-- dependent (a library published, then pinned in an app) → the downstream run launched once the upstream review's publication is done (`publication.done`), under the same /goal, no stop between them
+- dependent (a library published, then pinned in an app; a criterion of the app that reads what the other repo produces — firmware frames, a library's output — depends on it too) → the downstream run launched once the upstream review's publication is done (`publication.done`), under the same /goal, no stop between them
 - each run: its own `projectRoot`, `baseCommit`, criteria and `publish` (for the run and its review); the go request lists the external actions of all of them
 
 **Result** (`result` in the report): `in: "project"` → already in the working tree · `in: "integration"` → on `result.branch`: `git -C <root> merge --squash <branch>`, then the « spec » commit (§8)
@@ -357,9 +357,10 @@ criteria pass → commit « spec : <nom> » → clean-up sub-agent → commit «
 
 Likely secret or binary > 10 MB → never committed unasked (§4).
 
-**Last reply = the end**: « La spec est terminée. » first → a security problem outside the spec, if any (« Always ») → the result (§2) · criteria checked off · one line on the clean-up and the local commits → « Pour un autre sujet, ouvre une nouvelle conversation. » · part of the clean-up needs his yes → one yes/no question on that alone, after that sentence, the very last line (§3).
+**Last reply = the end**: « La spec est terminée. » first → a security problem outside the spec, if any (« Always ») → the result (§2) · criteria checked off · one line on the clean-up and the local commits → « Pour un autre sujet, ouvre une nouvelle conversation. » · part of the clean-up needs his yes → one yes/no question on that alone, naming the exact paths, after that sentence, the very last line (§3).
 
 **What the work revealed → second spec, not this conversation**
+- his own request mid-run for more than the spec (an extra mode) → never added to the running run: the same draft, or a new criterion only after his explicit yes on its text, said in one line, no options
 - task wider than planned, neighbouring problem, follow-up → before the last reply, a second spec file next to the first, headed « Brouillon — pas encore de go »: goal in one sentence, what was found, proposed criteria
 - the last reply gives it one line: « Ces points méritent une deuxième spec : specs/<x>.md — à lancer dans une nouvelle conversation avec /spec-first. »
 - never offered as options to carry on here
