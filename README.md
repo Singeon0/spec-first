@@ -127,7 +127,7 @@ Its arguments, and when the orchestrator passes them:
 |---|---|
 | `groups` | criteria that can't be checked apart share a group (three at most); omitted → one group per criterion |
 | `quickTestCommand` | whenever the full suite takes minutes: developers, fusions and one critic per panel run this fast subset; it is the light check's non-regression |
-| `setupCommand` | when a fresh copy needs dependencies, local config or the commit hooks' environment to run |
+| `setupCommand` | when a fresh copy needs dependencies, local config or what the commit hooks need to run (never a hook installer) |
 | `subdir` | in a monorepo: the project's folder; copies are made at the repository top, setup and tests run from it |
 | `maxGroups` | groups active at once, three by default: lower on a small machine, higher when the owner asks to speed up |
 | `dependsOn` | the dependency graph of the spec: a group starts as soon as what it builds on is merged, without holding a slot while it waits — one run for the whole spec |

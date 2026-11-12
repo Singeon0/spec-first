@@ -1,19 +1,23 @@
 // Measures what a workflow sends to its agents on the happy path: number of agents and size of
 // every prompt, per phase. Agents are fakes that answer the minimal « all good » object built
 // from each call's schema. Usage: node tests/measure.mjs run|review fixtures/<args>.json [--json|--prompts]
-// (--prompts: like --json, with each call's full prompt).
+// (--prompts: like --json, with each call's full prompt). --reject: every verdict is « fail » on an
+// agent's first round, so the repair, re-judge and retry paths run too.
 import { readFileSync, existsSync } from 'node:fs'
 
-const [kind, fixture, flag] = process.argv.slice(2)
+const [kind, fixture, ...flags] = process.argv.slice(2)
+const flag = flags.find(f => f !== '--reject')
+const REJECT = flags.includes('--reject')
 const SRC = readFileSync(new URL(`../workflows/${kind}.js`, import.meta.url), 'utf8').replace(/^export const meta/m, 'const meta')
 const args = JSON.parse(readFileSync(existsSync(fixture) ? fixture : new URL(fixture, import.meta.url), 'utf8'))
 
 let n = 0
 const STR = { summary: 'done', proof: 'ran the test, it passes', tests: 'make test: ok' }
 const EMPTY_OK = /^(blocker|reason|note|why|cause)$/
+let rejecting = false
 function fake(schema, key = '') {
   if (!schema) return null
-  if (schema.enum) return schema.enum.includes('pass') ? 'pass' : schema.enum[0]
+  if (schema.enum) return rejecting && schema.enum.includes('pass') ? schema.enum.find(v => v === 'defect' || v === 'fail') : schema.enum.includes('pass') ? 'pass' : schema.enum[0]
   switch (schema.type) {
     case 'object': {
       const o = {}
@@ -37,6 +41,7 @@ g.log = () => {}
 g.phase = () => {}
 g.agent = async (prompt, o = {}) => {
   calls.push({ label: o.label || '', phase: o.phase || '', model: o.model || '', chars: prompt.length, schema: JSON.stringify(o.schema || {}).length, ...(flag === '--prompts' && { prompt, schemaText: JSON.stringify(o.schema || {}) }) })
+  rejecting = REJECT && !/essai [2-9]|relance|apr[eè]s r[eé]paration/i.test(o.label || '')
   return fake(o.schema)
 }
 g.parallel = async jobs => JSON.parse(JSON.stringify(await Promise.all(jobs.map(j => j()))))

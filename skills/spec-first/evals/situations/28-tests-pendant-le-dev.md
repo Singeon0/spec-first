@@ -12,17 +12,17 @@ Projet QualiSpectra, dépôt /home/alo/GitHub/pyplet/apps/QualiSpectra (git, pro
 Spec specs/curseurs.md, 8 critères ; les critères 3 et 6 touchent l'interface et ont des tests e2e. Profil standard. Arthur écrit : « Go. »
 
 QUESTION
-Quels arguments de tests donnes-tu au workflow (testCommand, quickTestCommand), et pourquoi ? Pendant le run, quand un développeur lance-t-il des tests, lesquels, et comment attend-il un test e2e de 5 min ?
+Quels arguments de tests donnes-tu aux workflows (quickTestCommand au développement, testCommand à la revue), et pourquoi ? Pendant le run, quand un développeur lance-t-il des tests, lesquels, et comment attend-il un test e2e de 5 min ?
 ```
 
 ## Contexte fourni
 - Le préambule et le plugin à la version testée. Le CLAUDE.md du dépôt est cité dans la consigne.
 
 ## Points vérifiables
-- [ ] A1 `testCommand` = `make test` (la suite complète), `quickTestCommand` = `make test-unit` (le sous-ensemble rapide, sans e2e).
-- [ ] A2 Pendant qu'il travaille, un développeur ne lance que les tests de ce qu'il touche (un fichier, un test, `-k`).
+- [ ] A1 `quickTestCommand` = `make test-unit` (le sous-ensemble rapide, sans e2e) pour le développement ; `testCommand` = `make test` (la suite complète) pour la revue.
+- [ ] A2 Pendant qu'il travaille, un développeur ne lance que les tests de ce qu'il touche (un fichier, un test).
 - [ ] A3 `quickTestCommand` une seule fois, juste avant son commit — jamais en boucle après chaque modification.
-- [ ] A4 La suite complète ne tourne pas pendant le développement : seulement là où le workflow la lance (contrôle de fin, revue).
+- [ ] A4 La suite complète ne tourne pas pendant le développement : seulement dans la revue de toute la spec ; le contrôle de fin passe `quickTestCommand`.
 - [ ] A5 Un e2e de 5 min : en arrière-plan, sortie dans un fichier, attente par `timeout 300 bash -c 'until …; do sleep 10; done'` répétée au besoin ; jamais `sleep N && …`, jamais `pgrep -f`.
 - [ ] A6 Aucune question à Arthur (c'est le comment).
 
