@@ -1,7 +1,7 @@
 export const meta = {
   name: 'review',
   description: 'spec-first review, once per spec, separate from the development run: a fixed panel whatever the spec size — six reviewers in xhigh, each with one angle (owner, reliability, security, performance, integration and maintenance, usage), reading the whole spec and every commit of it, and two live testers in xhigh who run the real result and drive it with Chrome DevTools along user journeys covering every criterion; duplicates merged, unproven leads tried live by one tester; one developer repairs every proven blocking or major defect in one batch, re-judged only by the reviewer that raised each one and a live replay of its scenario, three repair rounds at most; then, only if the owner authorized it with his go, the external actions he listed (push, merge request, CI, merge, tag, release), checked from outside; profil « rapide »: Sonnet',
-  whenToUse: 'Called by the spec-first skill once every criterion of the spec passed the development runs (spec-first:run), or alone when the owner asks for a review. args: { specPath, projectRoot, baseCommit, criteria: [{ id, text }], workspace?, branch?, testCommand?, quickTestCommand?, setupCommand?, subdir?, exclusive?: [string] | { [resource]: [ids] }, publish?: { actions: string, criteria: [ids] }, profil?: "standard"|"rapide", focus?: [{ id?, reviewer, finding }], waitRound?: number, waitAt?: { [read]: number }, budget?: number } with absolute paths. baseCommit: the commit the spec started from (the baseCommit of its first run) — every reviewer reads the whole diff from it. criteria: every criterion of the spec. workspace + branch: where the result lives — the run report\'s result.worktree and result.branch when result.in is "integration"; omitted → a review copy is made from the project\'s HEAD (commit the work first). Repairs are committed on that branch, never on the owner\'s. focus: a targeted re-review after a criterion was relaunched in a development run — only the reviewers named judge again, only those findings, plus a live replay by the testers; no full panel — the report\'s focus field gives it ready-made for every open defect. A reviewer that never answered → silent in the report, pass false: resume with resumeFromRunId and the same args. A remote pipeline, a registry, a human review still running → returns « waiting »: resume with resumeFromRunId, the same args, and waitRound and waitAt from the report. budget: output tokens, the review stops cleanly before it. Not for a bare slash-command call without args: tell the user to run /spec-first instead.',
+  whenToUse: 'Called by the spec-first skill once every criterion of the spec passed the development runs (spec-first:run), or alone when the owner asks for a review. args: { specPath, projectRoot, baseCommit, criteria: [{ id, text }], specBrief?, workspace?, branch?, testCommand?, quickTestCommand?, setupCommand?, subdir?, exclusive?: [string] | { [resource]: [ids] }, publish?: { actions: string, criteria: [ids] }, profil?: "standard"|"rapide", focus?: [{ id?, reviewer, finding }], waitRound?: number, waitAt?: { [read]: number }, budget?: number } with absolute paths. baseCommit: the commit the spec started from (the baseCommit of its first run) — every reviewer reads the whole diff from it. criteria: every criterion of the spec. workspace + branch: where the result lives — the run report\'s result.worktree and result.branch when result.in is "integration"; omitted → a review copy is made from the project\'s HEAD (commit the work first). Repairs are committed on that branch, never on the owner\'s. focus: a targeted re-review after a criterion was relaunched in a development run — only the reviewers named judge again, only those findings, plus a live replay by the testers; no full panel — the report\'s focus field gives it ready-made for every open defect. A reviewer that never answered → silent in the report, pass false: resume with resumeFromRunId and the same args. A remote pipeline, a registry, a human review still running → returns « waiting »: resume with resumeFromRunId, the same args, and waitRound and waitAt from the report. budget: output tokens, the review stops cleanly before it. Not for a bare slash-command call without args: tell the user to run /spec-first instead.',
   phases: [
     { title: 'Revue', detail: 'six reviewers in xhigh, one angle each, on the whole spec and every commit; two live testers in xhigh driving the real result with Chrome DevTools, by user journeys' },
     { title: 'Pistes', detail: 'duplicates merged; unproven leads tried live by one tester' },
@@ -45,6 +45,12 @@ const dup = ids.filter((id, i) => ids.indexOf(id) !== i)
 if (dup.length) return { error: `Criterion ids must be unique. Repeated: ${[...new Set(dup)].join(', ')}.` }
 const byId = Object.fromEntries(CRITERIA.map(c => [c.id, c]))
 const GENERAL = 'general' // a finding no single criterion carries (a security hole, a slowdown)
+
+// The spec outside its criteria — goal, out-of-scope list, « Limites » — passed by the caller: the
+// agents then hold the whole spec and never open the file. Not passed → one whole read
+// (kipp, 1.9.2: every agent read it whole, then again in slices).
+const BRIEF = String(input.specBrief || '').trim()
+const SPEC_LINE = BRIEF ? `Spec: ${SPEC} — do not open it: its goal, out-of-scope list and « Limites » are here, its criteria below.\n<spec_brief>\n${BRIEF}\n</spec_brief>` : `Spec: ${SPEC} — read it once, whole, never in slices.`
 
 const COPIES = '.spec-first/copies'
 const WS_IN = String(input.workspace || '').replace(/\/+$/, '')
@@ -165,6 +171,10 @@ const ENSURE_HIDDEN = `cd "${ROOT}" && x=$(git rev-parse --git-path info/exclude
 const SUBMODULES = '{ [ ! -f .gitmodules ] || git submodule update --init --recursive; }'
 const ARGS_TAG = hashOf(JSON.stringify({ ...input, waitRound: undefined, waitAt: undefined, budget: undefined })).toString(36)
 const suitePath = name => `${ROOT}/.spec-first/logs/${SPEC_ID}-revue-${ARGS_TAG}-${name}.log`
+// One launch recipe per spec for every live tester, kept between rounds and reviews (kipp, 1.9.2:
+// each tester rebuilt the server, its seeding and its reproduction scripts).
+const HARNESS = `${ROOT}/.spec-first/harness/${SPEC_ID}`
+const HARNESS_RULE = `Launch recipe: ${HARNESS}/launch.sh <port> (start, seed, print the URL) — it exists → use it, fix it there if it fails; absent → write it once the result runs. Keep your reproduction scripts there, named in your proofs: the re-judgement reruns them.`
 const suiteCommand = (at, file, cmd) => `${ENSURE_HIDDEN} && mkdir -p .spec-first/logs && rm -f "${file}" && (cd "${at}" && ${cmd}) > "${file}" 2>&1; echo "EXIT $?" >> "${file}"`
 const PREPARE = setupCommand
   ? `run \`${setupCommand}\` from ${SUBDIR ? `its ${SUBDIR} folder` : 'its root'}.`
@@ -228,7 +238,7 @@ const COMMON_RULES = `Rules for everyone:
 
 // Chrome DevTools, shared by every live tester at once: each works in its own isolated context, on
 // its own pages, always by pageId — never select_page, never another tester's page.
-const BROWSER_RULE = name => `Browser: use the Chrome DevTools tools (load them with ToolSearch, query "chrome-devtools", if they are deferred). Other testers use the same browser at the same time: open your pages only with new_page and isolatedContext "${name}", pass that pageId on every call, never call select_page, never touch a page you did not open, close yours before you return. Prefer take_snapshot to take_screenshot (a screenshot only for what must be seen: layout, colours, images); read list_console_messages and list_network_requests for errors on every journey; a performance trace when speed is part of a criterion or of a lead. No Chrome DevTools tools at all → say so in your proofs, and test without the browser what can be.`
+const BROWSER_RULE = name => `Browser: use the Chrome DevTools tools (load them with ToolSearch, query "chrome-devtools", if they are deferred). Other testers use the same browser at the same time: open your pages only with new_page and isolatedContext "${name}", pass that pageId on every call, never call select_page, never touch a page you did not open, close yours before you return. One evaluate_script per check — what a script can do, then every value read at once; the click and drag tools only where a real pointer matters; never one click or one snapshot per call. Prefer take_snapshot to take_screenshot (a screenshot only for what must be seen: layout, colours, images); read list_console_messages and list_network_requests for errors on every journey; a performance trace when speed is part of a criterion or of a lead. No Chrome DevTools tools at all → say so in your proofs, and test without the browser what can be.`
 
 // ---------------------------------------------------------------- schemas
 const FINDING = {
@@ -240,6 +250,7 @@ const FINDING = {
     title: { type: 'string', description: 'one line, in French' },
     proof: { type: 'string', description: 'defect: the exact reproduction (command and output, or steps and observed behaviour). lead: what makes you suspect it, written as a scenario a live tester can try. ' + PROOF_CAP },
     cause: { type: 'string', enum: ['code', 'environment'] },
+    where: { type: 'string', description: 'defect: the file and function it sits in, when you found it — one line' },
   },
   required: ['criterion', 'kind', 'severity', 'title', 'proof'],
 }
@@ -439,7 +450,7 @@ function reviewerPrompt(key, extra) {
 
 You are one of six independent reviewers, each with a different angle, plus live testers who run the result in a browser. You do not see the others; do not try to agree with anyone. Find real problems from your angle and prove them — do not approve, do not summarise the work.
 
-Spec: ${SPEC} — read it whole first (goal, criteria, out of scope, « Limites »).
+${SPEC_LINE}
 ${list(CRITERIA)}
 The result lives in ${W} (branch ${BR}). ${changes}${pubNote}
 ${extra || ''}
@@ -463,12 +474,13 @@ function testerPrompt(i, cs, extra) {
   const runsSuite = i === 0 && suiteCmd
   return `You are LIVE TESTER ${i + 1} of ${N_TESTERS}. Run the real result and use it as its users would, to check each criterion below on the real thing — never by reading code alone.
 
-Spec: ${SPEC} — read it first. Your criteria:
+${SPEC_LINE}
+Your criteria:
 ${list(cs)}
 ${CRITERIA.length > cs.length ? `The other criteria go to another tester; you may cross them on a journey — report what you see.\n` : ''}The result lives in ${W} (branch ${BR}). ${changes}${pubNote}
 ${extra || ''}
 How:
-1. Start the result yourself from ${inSub(W)} (its server, app or tool) on your own ports; it lacks its dependencies → ${PREPARE}
+1. Start the result yourself from ${inSub(W)} (its server, app or tool) on your own ports; it lacks its dependencies → ${PREPARE} ${HARNESS_RULE}
 2. Plan a few user journeys that cover every criterion of yours as one realistic use, then run them; then the edge cases: bad input, empty and boundary values, reload, back button, offline or a slow network when it matters, the exact wording of each criterion.
 3. ${BROWSER_RULE(`spec-first-${key}`)}
 4. Not a web interface → exercise it the way its user does: the CLI, the API calls, the library imported in a fresh environment.
@@ -545,7 +557,7 @@ Spec: ${SPEC}. The result lives in ${W} (branch ${BR}). ${changes}
 <leads>
 ${leads.map(f => `[${f.n}] (critère ${f.criterion}, ${f.severity}) ${f.title} — ${f.proof}`).join('\n')}
 </leads>
-Start the result from ${inSub(W)} on your own ports (it lacks its dependencies → ${PREPARE}).
+Start the result from ${inSub(W)} on your own ports (it lacks its dependencies → ${PREPARE}). ${HARNESS_RULE}
 ${BROWSER_RULE('spec-first-pistes')}
 Do not edit any tracked file. ${portRule(30)}${RESOURCES.length ? `
 You hold the exclusive resource(s) ${RESOURCES.map(x => `« ${x} »`).join(', ')} for this task.` : ''}
@@ -606,7 +618,7 @@ ${fs.map(f => `[${f.n}] (critère ${f.criterion}) ${f.title} — ${f.proof}${f.d
 </your_findings>
 A check you cannot run at all (a device or a credential missing) → "unverifiable": true, never "fixed".
 ${replay.length ? `Also replay the main path of these criteria live — quickly, the repair may have touched them — and report a regression in newDefects:\n${list(replay, 'replay')}\n` : ''}Spec: ${SPEC}. The result lives in ${W} (branch ${BR}). ${changes}
-${isTester ? `Start the result from ${inSub(W)} on your own ports (it lacks its dependencies → ${PREPARE}).
+${isTester ? `Start the result from ${inSub(W)} on your own ports (it lacks its dependencies → ${PREPARE}). ${HARNESS_RULE}
 ${BROWSER_RULE(`spec-first-${k}-r${round}`)}` : 'Never use the browser tools.'}
 ${isTester && round > 0 && k === firstTester && testCommand ? `The repair is done: run the full suite once, in the background, \`${suiteCommand(inSub(W), suitePath(`apres-reparation-${round}`), testCommand)}\`, and read it before you return — a test failing now is in newDefects.\n` : ''}newDefects: only what the repair itself broke, proven. Do not edit any tracked file. ${portRule(40 + 10 * round + [...bySource.keys()].indexOf(k))}${isTester && RESOURCES.length ? `
 You hold the exclusive resource(s) ${RESOURCES.map(x => `« ${x} »`).join(', ')} for this task.` : ''}
@@ -667,12 +679,13 @@ try {
     const effort = REPAIR_EFFORTS[round]
     const dev = await ask(`You are the developer repairing the review of a spec, round ${round + 1} of at most ${REPAIR_EFFORTS.length}. A panel (six reviewers, live testers${ci.started ? ', the CI' : ''}) proved the defects below on the result. Repair them all, at their root, without breaking any criterion.
 
-Spec: ${SPEC} — read it first.
+${SPEC_LINE}
 ${list(CRITERIA)}
 <defects>
-${batch.map(f => `[${f.n}] (critère ${f.criterion}, ${f.severity}, relevé par ${f.from.map(labelOf).join(', ')}) ${f.title}\n${f.proof}`).join('\n\n')}
+${batch.map(f => `[${f.n}] (critère ${f.criterion}, ${f.severity}, relevé par ${f.from.map(labelOf).join(', ')}) ${f.title}${f.where ? ` — in ${f.where}` : ''}\n${f.proof}`).join('\n\n')}
 </defects>
 Work in ${W} (branch ${BR}) — every file you edit is under it, never under ${ROOT}. ${changes}
+Start from each defect's reproduction and place, no wider exploration. Reading: grep finds the place, a file is read once — never in successive slices, never twice. Keep ${ROOT}/.spec-first/logs/${SPEC_ID}-reparation-${round + 1}.md current (fixed, files changed, left to do): after a context compaction, read it and go on.
 Before touching code, for each defect: a slip (fix the cause) or an approach that cannot hold (take another, never a second patch on it), or the environment (fix the configuration, no code).
 Re-run each reproduction and the tests of what you touched${quickTestCommand ? `, then \`${quickTestCommand}\` once` : ''}${SUBDIR ? ` from ${SUBDIR}` : ''} before returning; never the full suite. Then commit on ${BR}. Commit hooks always run, never --no-verify; one fails for a reason outside your changes → "blocker" starting with "TECHNIQUE:".
 Never run commands that rewrite files outside the defects (repo-wide formatters, lockfile upgrades). A defect you judge wrong → done false and, in note, the spec sentence it contradicts, quoted.

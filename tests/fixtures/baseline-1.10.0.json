@@ -1,12 +1,12 @@
 {
-  "version": "1.9.3",
-  "note": "measured by tests/measure.mjs on the fixtures, spec-first 1.9.3",
+  "version": "1.10.0",
+  "note": "measured by tests/measure.mjs on the fixtures, spec-first 1.10.0 — raised from 1.9.3 (run 342424, review 84372) for the token-cost rules: read-once, notes file, launch recipe, batched browser checks",
   "run": {
     "agents": 45,
-    "promptChars": 342424
+    "promptChars": 344445
   },
   "review": {
     "agents": 8,
-    "promptChars": 84372
+    "promptChars": 85196
   }
 }

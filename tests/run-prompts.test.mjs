@@ -87,3 +87,47 @@ test('proof fields are capped (failures seen: proofs over 2,000 chars broke the 
   })
   assert.ok(seen > 50, `only ${seen} proof fields checked`)
 })
+
+// Token cost on kipp (1.9.2, sprint 6): every agent read the spec whole and then again in slices,
+// each live tester rebuilt the server and its seeding, browsers were driven one click per turn, and
+// repair developers explored for 50 turns before their first write.
+const BRIEF = 'But : annoter à plusieurs. Hors périmètre : mobile. Limites : jamais la base de prod.'
+test('specBrief: the agents hold the spec and do not open it; without it, one whole read', () => {
+  for (const [kind, args] of [['run', RUN], ['review', REVIEW]]) for (const flags of [[], ['--reject']]) {
+    const at = `${kind} ${flags.join('')}`
+    const withBrief = prompts(kind, { ...args, specBrief: BRIEF }, ...flags), without = prompts(kind, args, ...flags)
+    assert.ok(withBrief.filter(c => c.prompt.includes(`— do not open it`)).length >= 3, at)
+    for (const c of withBrief) {
+      assert.doesNotMatch(c.prompt, /read it (whole )?first|read it once/, `${at} — ${c.label}`)
+      if (c.prompt.includes('— do not open it')) assert.ok(c.prompt.includes(`<spec_brief>\n${BRIEF}\n</spec_brief>`), `${at} — ${c.label}`)
+    }
+    assert.ok(without.filter(c => c.prompt.includes('read it once, whole, never in slices')).length >= 3, at)
+    for (const c of without) assert.doesNotMatch(c.prompt, /read it (whole )?first|spec_brief/, `${at} — ${c.label}`)
+  }
+})
+
+test('live testers share one launch recipe and batch their browser checks', () => {
+  for (const v of ['review, happy path', 'review, every verdict fails once']) {
+    const testers = variants[v].filter(c => /LIVE TESTER/.test(c.prompt))
+    assert.ok(testers.length >= 2, v)
+    for (const c of testers) {
+      assert.match(c.prompt, /Launch recipe: \S+\/\.spec-first\/harness\/\S+\/launch\.sh <port>/, `${v} — ${c.label}`)
+      assert.match(c.prompt, /One evaluate_script per check/, `${v} — ${c.label}`)
+    }
+  }
+  assert.ok(variants['review, every verdict fails once'].some(c => /^Après réparation/.test(c.label) && c.prompt.includes('Launch recipe:')), 'the re-judging tester reuses it')
+})
+
+test('developers read a file once and keep notes for after a compaction; a finding can name its place', () => {
+  const READ = 'a file is read once — never in successive slices, never twice'
+  const devs = [...variants['run, every verdict fails once'].filter(c => c.phase === 'Développement'), ...variants['review, every verdict fails once'].filter(c => c.label.startsWith('Réparation essai'))]
+  assert.ok(devs.length >= 2)
+  for (const c of devs) {
+    assert.ok(c.prompt.includes(READ), c.label)
+    assert.match(c.prompt, /Keep \S+\.spec-first\/logs\/\S+ current .*after a context compaction, read it and go on/, c.label)
+  }
+  const repair = variants['review, every verdict fails once'].find(c => c.label.startsWith('Réparation essai'))
+  assert.ok(repair.prompt.includes("Start from each defect's reproduction and place, no wider exploration."))
+  const reviewer = variants['review, happy path'].find(c => c.label.startsWith('Relecteur'))
+  assert.ok(JSON.parse(reviewer.schemaText).properties.findings.items.properties.where, 'findings carry "where"')
+})
