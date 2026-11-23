@@ -9,23 +9,44 @@ Ce banc vérifie, à chaque version du plugin, qu'un orchestrateur qui lit SKILL
 - `resultats-1.7.0.md` : les notes de la 1.7.0, point de départ des comparaisons.
 - `resultats-1.8.0.md` : les notes de la 1.8.0 (27 situations ; la 28 date de la 1.10.0).
 - `resultats-1.9.0.md` : les notes de la 1.9.0, avant et après corrections.
+- `acquis.md` : les points acquis (réussis aux deux dernières versions notées), recalculés après chaque version ; la barrière de sortie s'appuie dessus.
+- `rejets.md` : les modifications du SKILL qui ont fait tomber un point, et les pistes refusées par Arthur, avec la condition pour les refaire.
 
 Modifié le 07/11/2026 (1.9.0, D15) : les grilles et les consignes parlent de la revue (spec-first:review) au lieu du contrôle strict ; chaque situation modifiée porte une ligne « Modifié le 07/11/2026 » sous « Décisions en jeu ».
 
+Modifié le 23/11/2026 (décision d'Arthur) : trois passages par situation, notés à la majorité ; points acquis et barrière de sortie ; registre des rejets.
+
 ## Relancer le banc
 1. Mettre la version à tester dans un dossier à part, sans `skills/spec-first/evals/` (les agents ne doivent pas voir les réponses attendues), par exemple : `mkdir /tmp/sf-X && git archive <commit> | tar -x -C /tmp/sf-X --exclude=skills/spec-first/evals`.
-2. Pour chaque situation, un agent neuf, `subagent_type: "opus-medium"` (jamais un autre modèle). Sa consigne : le contenu de `preambule.md` avec `{PLUGIN}` remplacé par ce dossier, une ligne vide, puis le bloc « Consigne » du fichier, tel quel. Lancer toutes les situations en même temps.
+2. Pour chaque situation, deux agents neufs, `subagent_type: "opus-medium"` (jamais un autre modèle). Leur consigne : le contenu de `preambule.md` avec `{PLUGIN}` remplacé par ce dossier, une ligne vide, puis le bloc « Consigne » du fichier, tel quel. Lancer tous les agents en même temps, par vagues si la session limite leur nombre (20 en 1.9.0).
 3. Les agents n'exécutent rien. Vérifier dans leur transcript qu'ils n'ont lancé aucun workflow, agent, commande git ou ssh, et qu'ils n'ont pas ouvert `evals/` ; sinon la réponse ne compte pas.
-4. Une situation où la réponse surprend : la relancer avec un deuxième agent neuf avant de conclure.
+4. Noter les deux réponses. Si l'une réussit un point que l'autre rate : un troisième agent neuf, même consigne, pour cette situation. Sinon il ne changerait pas la majorité, on ne le lance pas.
+5. Trois passages pour toutes les situations : 26 sur 28 ont des points acquis à protéger, et la 17 et la 28 n'en gagnent qu'à la majorité. Coût : de 56 à 84 agents par version au lieu de 28 ; le troisième seulement là où les deux premiers divergent.
 
 ## Noter une réponse
-- Chaque point vérifiable : oui = 1, partiel = 0,5, non = 0, avec une citation courte de la réponse comme preuve. Une intention vague ne vaut pas « oui ».
+- Chaque réponse est notée seule. Chaque point vérifiable : oui = 1, partiel = 0,5, non = 0, avec une citation courte de la réponse comme preuve. Une intention vague ne vaut pas « oui ».
+- Un point est réussi pour la version s'il vaut « oui » dans au moins deux réponses sur trois (deux sur deux sans troisième agent) ; « partiel » compte comme raté. Le total se compte sur les réponses a, comme avant ; la barrière se juge sur les points à la majorité.
 - Une erreur marquée ⛔ dans les erreurs typiques : la situation est en échec, quel que soit le score.
 - Une réponse qui suit le SKILL contre une décision d'Arthur : le point vaut « non », et l'écart est imputé au SKILL (défaut de rédaction, pas de l'agent).
 - Le même point manqué par plusieurs agents : défaut de rédaction du SKILL ; citer la ligne en cause.
-- Écrire les notes d'une version dans `resultats-<version>.md`, avec le même tableau que `resultats-1.7.0.md`, et comparer situation par situation, pas seulement le total.
+- Écrire les notes d'une version dans `resultats-<version>.md`, avec le même tableau que `resultats-1.7.0.md` (une ligne par réponse : a, b, c), et comparer situation par situation, pas seulement le total.
+- Pour chaque situation, nommer les points ratés à la majorité (A3, A6…) : sans eux, `acquis.md` ne peut pas être recalculé.
+
+## Barrière de sortie
+- Point acquis : réussi aux deux dernières versions notées (`acquis.md`). Rechute : un point acquis raté à la majorité (un seul agent sur trois ne suffit pas).
+- Une version avec une rechute n'est pas livrée, sauf si Arthur accepte cette régression explicitement ; son accord s'écrit dans le résultat, avec la date et la raison. Sans accord, la modification en cause est retirée et notée dans `rejets.md`.
+- Chaque `resultats-<version>.md` finit par ce bilan :
+  - Gains : points ratés à la version notée précédente, réussis maintenant.
+  - Rechutes sur points acquis : le point, la note de chaque réponse, la ligne du SKILL en cause.
+  - Bilan : gains − rechutes.
+  - Décision : livrée (aucune rechute) ; livrée, rechute acceptée par Arthur le JJ/MM/AAAA (raison) ; ou pas livrée (modification retirée, voir `rejets.md`).
+- Les autres baisses (points réussis à la version précédente seulement) se listent à part, hors bilan. Une situation nouvelle n'entre pas dans le bilan.
 
 ## Tenir le banc à jour
 - Arthur change une décision : mettre à jour `decisions.md` (en datant le changement), puis les points des grilles concernés.
 - Une nouvelle version décale les lignes du SKILL : mettre à jour les « Repères », sans toucher aux points vérifiables.
+- Une version notée : recalculer `acquis.md` sur les deux dernières versions notées. Une version jouée deux fois (avant et après corrections) : seule la dernière notation compte.
+- Un point dont l'attendu s'inverse (décision d'Arthur) n'est plus acquis ; il le redevient après deux versions réussies sous le nouveau texte. Un simple renommage (même conduite) garde son historique.
+- Une version fait retomber un point acquis, une modification est abandonnée, ou Arthur refuse une piste : une ligne dans `rejets.md`.
+- Avant de proposer une modification du SKILL : lire `rejets.md` ; ne pas reproposer ce qui y figure sans remplir sa condition.
 - Ajouter une situation : même format, numéro suivant ; partir d'un problème vu en vrai, ou d'un cas générique qui touche un point sensible (quand s'arrêter, quand rejuger, quand lancer la revue, quand publier, quand demander à Arthur).

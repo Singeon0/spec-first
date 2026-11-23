@@ -7,6 +7,7 @@ Mettre ce fichier à jour quand Arthur change une décision (et dater la modific
 Version de référence : décisions rappelées par Arthur le 22/10/2026, pour la revue de la 1.7.0.
 Modifié le 27/10/2026 (1.8.0) : D1 ne vaut plus que pour le profil standard ; ajout de D13 et D14.
 Modifié le 07/11/2026 (1.9.0) : ajout de D15 (revue séparée) ; les grilles qui parlent du contrôle strict (notamment 17 et 23) sont à réaligner avant le prochain passage du banc. Réalignées le 07/11/2026 : situations 01 à 07, 09 à 12, 14, 15 et 17 à 25 (17 réécrite) ; 19 A4 et 07 A6 suivent la décision d'Arthur sur la revue immédiate, même quand un appareil manque.
+Modifié le 23/11/2026 (banc) : décision d'Arthur sur le banc lui-même, pas sur le plugin. Chaque situation est jouée trois fois et notée à la majorité (le troisième passage seulement si les deux premiers divergent sur un point) ; un point réussi aux deux dernières versions notées est acquis ; une version qui en fait retomber un n'est pas livrée sans son accord explicite, daté et motivé ; les modifications refusées vont dans rejets.md, lu avant toute proposition de modification du SKILL. Détail : README.md, acquis.md, rejets.md.
 
 | Code | Décision |
 |---|---|
