@@ -125,6 +125,7 @@ Its arguments, and when the orchestrator passes them:
 
 | Argument | When |
 |---|---|
+| `specBrief` | always, to the run and the review: the spec's goal, out-of-scope list and « Limites », word for word — the agents then never open the spec file |
 | `groups` | criteria that can't be checked apart share a group (three at most); omitted → one group per criterion |
 | `quickTestCommand` | whenever the full suite takes minutes: developers, fusions and one critic per panel run this fast subset; it is the light check's non-regression |
 | `setupCommand` | when a fresh copy needs dependencies, local config or what the commit hooks need to run (never a hook installer) |
@@ -218,7 +219,8 @@ node --test tests/*.test.mjs
 They run the workflows with a fake `agent` and a `parallel` that, like the
 Workflow runtime, hands back copies of the jobs' results. `run-prompts` and
 `prompt-size` replay the arguments of real runs (`tests/fixtures/`) and check the
-rules sent to the agents, and that the prompts are no bigger than in 1.9.3.
+rules sent to the agents, and that the prompts are no bigger than the baseline
+(`tests/fixtures/baseline-1.10.0.json`).
 
 ```
 node tests/measure.mjs run tests/fixtures/run-qualispectra-sprint6.json
