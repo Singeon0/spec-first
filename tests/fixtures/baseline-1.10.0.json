@@ -1,12 +1,12 @@
 {
   "version": "1.10.0",
-  "note": "measured by tests/measure.mjs on the fixtures, spec-first 1.10.0 — raised from 1.9.3 (run 342424, review 84372) for the token-cost rules: read-once, notes file, launch recipe, batched browser checks",
+  "note": "measured by tests/measure.mjs on the fixtures, spec-first 1.10.0 — raised from 1.9.3 (run 342424, review 84372) for the token-cost rules: read-once, notes file, launch recipe, batched browser checks; raised again (run 344445, review 85196) for the verification rules: tests deleted, skipped or loosened are a defect, no workaround on a flaky test, generated inputs for a criterion stated as a property",
   "run": {
     "agents": 45,
-    "promptChars": 344445
+    "promptChars": 348646
   },
   "review": {
     "agents": 8,
-    "promptChars": 85196
+    "promptChars": 85297
   }
 }

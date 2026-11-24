@@ -117,7 +117,7 @@ const REVIEWERS = {
   },
   integration: {
     label: 'intégration et maintenance',
-    brief: `You are the INTEGRATION AND MAINTENANCE REVIEWER. The result combines work developed separately, merged one by one. Look for what the combination broke (a conflict resolved by dropping one side, two implementations of the same thing, one part undoing another, a shared file where one change overrode another), side effects on behaviour that worked before, changes no criterion needed (scope creep), dead or duplicated code left behind, fragile code that will break on the next change. Prove each defect: the reproduction, or the clashing changes quoted with their effect.`,
+    brief: `You are the INTEGRATION AND MAINTENANCE REVIEWER. The result combines work developed separately, merged one by one. Look for what the combination broke (a conflict resolved by dropping one side, two implementations of the same thing, one part undoing another, a shared file where one change overrode another), side effects on behaviour that worked before, a test deleted, skipped or loosened (an assertion removed or widened) when no criterion asks for it, changes no criterion needed (scope creep), dead or duplicated code left behind, fragile code that will break on the next change. Prove each defect: the reproduction, or the clashing changes quoted with their effect.`,
   },
   usage: {
     label: 'usage',
@@ -687,7 +687,7 @@ ${batch.map(f => `[${f.n}] (critère ${f.criterion}, ${f.severity}, relevé par 
 Work in ${W} (branch ${BR}) — every file you edit is under it, never under ${ROOT}. ${changes}
 Start from each defect's reproduction and place, no wider exploration. Reading: grep finds the place, a file is read once — never in successive slices, never twice. Keep ${ROOT}/.spec-first/logs/${SPEC_ID}-reparation-${round + 1}.md current (fixed, files changed, left to do): after a context compaction, read it and go on.
 Before touching code, for each defect: a slip (fix the cause) or an approach that cannot hold (take another, never a second patch on it), or the environment (fix the configuration, no code).
-Re-run each reproduction and the tests of what you touched${quickTestCommand ? `, then \`${quickTestCommand}\` once` : ''}${SUBDIR ? ` from ${SUBDIR}` : ''} before returning; never the full suite. Then commit on ${BR}. Commit hooks always run, never --no-verify; one fails for a reason outside your changes → "blocker" starting with "TECHNIQUE:".
+Re-run each reproduction and the tests of what you touched${quickTestCommand ? `, then \`${quickTestCommand}\` once` : ''}${SUBDIR ? ` from ${SUBDIR}` : ''} before returning; never the full suite. Then commit on ${BR}. Commit hooks always run, never --no-verify; one fails for a reason outside your changes → "blocker" starting with "TECHNIQUE:". A test that fails now and then: never skip it, never add a sleep, never rerun it until it passes. Find the cause; not found → leave the test as it is and say so in your summary.
 Never run commands that rewrite files outside the defects (repo-wide formatters, lockfile upgrades). A defect you judge wrong → done false and, in note, the spec sentence it contradicts, quoted.
 ${portRule(60 + round)}${RESOURCES.length ? `
 You hold the exclusive resource(s) ${RESOURCES.map(x => `« ${x} »`).join(', ')} for this task.` : ''}

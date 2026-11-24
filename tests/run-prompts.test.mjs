@@ -131,3 +131,21 @@ test('developers read a file once and keep notes for after a compaction; a findi
   const reviewer = variants['review, happy path'].find(c => c.label.startsWith('Relecteur'))
   assert.ok(JSON.parse(reviewer.schemaText).properties.findings.items.properties.where, 'findings carry "where"')
 })
+
+// Verification rules (24/11/2026): a change must not weaken the tests that judge it, a flaky test is
+// never worked around, and a criterion stated as a property is tried on generated inputs.
+test('tests are protected: weakened tests are a defect, a flaky test is never worked around', () => {
+  const WEAK = 'a test deleted, skipped or loosened (an assertion removed or widened) when no criterion asks for it'
+  const FLAKY = 'never skip it, never add a sleep, never rerun it until it passes'
+  const run = variants['run, every verdict fails once'], review = variants['review, every verdict fails once']
+  const maintainers = run.filter(c => c.prompt.includes('You are the MAINTAINER'))
+  assert.ok(maintainers.length > 0)
+  for (const c of maintainers) assert.ok(c.prompt.includes(WEAK), c.label)
+  assert.ok(review.find(c => c.prompt.includes('INTEGRATION AND MAINTENANCE REVIEWER')).prompt.includes(WEAK))
+  const devs = [...run.filter(c => c.phase === 'Développement'), ...run.filter(c => c.prompt.includes('repairing the light check')), ...review.filter(c => c.label.startsWith('Réparation essai'))]
+  assert.ok(devs.length >= 3)
+  for (const c of devs) assert.ok(c.prompt.includes(FLAKY), c.label)
+  const testers = run.filter(c => c.prompt.includes('You are the TESTER'))
+  assert.ok(testers.length > 0)
+  for (const c of testers) assert.ok(c.prompt.includes('many generated inputs, not a few chosen examples'), c.label)
+})

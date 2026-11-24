@@ -543,13 +543,14 @@ const COMMON_RULES = `Rules for everyone in this run:
 - Commit hooks: never read or change their configuration (core.hooksPath, .githooks, .git/hooks).
 ${EXCL_RULE ? `- ${EXCL_RULE}\n` : ''}- CLAUDE.md and the project's conventions apply as usual.`
 
+const FLAKY_RULE = `A test that fails now and then: never skip it, never add a sleep, never rerun it until it passes. Find the cause; not found → leave the test as it is and say so in your summary.`
 const HOOK_RULE = `Commit hooks always run: never bypass them (--no-verify). A hook fails because of your changes → fix the cause. It fails for a reason outside your changes → a "${TECH}" blocker, the cause in a few French words.`
 
 // ---------------------------------------------------------------- personas
 const PERSONAS = {
   tester: {
     label: 'testeur',
-    brief: `You are the TESTER. Run the real result and try to break each criterion: main path, edge cases, bad input, empty and boundary values, the criterion's exact wording — build, run, call or open it, as its "observable" says. "pass" means you exercised it on the real result and it held; reading code is not enough. A result that took hours (a trained model): measure what was produced and check its origin (log, weights, config) — redo it only if that proof is doubtful. Visual or interactive criteria: check them on screen, as the owner would, with the screenshot and browser tools (ToolSearch if deferred). "unverifiable" only when a device or a credential is missing — the proof names it.`,
+    brief: `You are the TESTER. Run the real result and try to break each criterion: main path, edge cases, bad input, empty and boundary values, the criterion's exact wording — build, run, call or open it, as its "observable" says. "pass" means you exercised it on the real result and it held; reading code is not enough. A criterion stated as a property (a round trip, an invariant, the same effect when run twice, the same output as the old code) → many generated inputs, not a few chosen examples. A result that took hours (a trained model): measure what was produced and check its origin (log, weights, config) — redo it only if that proof is doubtful. Visual or interactive criteria: check them on screen, as the owner would, with the screenshot and browser tools (ToolSearch if deferred). "unverifiable" only when a device or a credential is missing — the proof names it.`,
   },
   owner: {
     label: 'propriétaire',
@@ -557,7 +558,7 @@ const PERSONAS = {
   },
   maintainer: {
     label: 'mainteneur',
-    brief: `You are the MAINTAINER. Read every change made in this run (diff against the commit below) and look for: security holes introduced, side effects on behaviour that worked before (targeted tests), changes no criterion needed (scope creep), fragile code that will break on the next change. Attach each defect to the criterion whose change causes it. Problems that existed before this run go in "outsideSpec", never as defects.`,
+    brief: `You are the MAINTAINER. Read every change made in this run (diff against the commit below) and look for: security holes introduced, side effects on behaviour that worked before (targeted tests), a test deleted, skipped or loosened (an assertion removed or widened) when no criterion asks for it, changes no criterion needed (scope creep), fragile code that will break on the next change. Attach each defect to the criterion whose change causes it. Problems that existed before this run go in "outsideSpec", never as defects.`,
   },
   integrator: {
     label: 'intégrateur',
@@ -807,14 +808,14 @@ ${COMMON_RULES}`, { ...HELPER, schema: COPY_SCHEMA, phase: 'Fusion', label: `Cop
 
 function workspaceRule(g, where, branch, from) {
   if (where) {
-    return `Your workspace is your copy ${where} (branch ${branch}), made in an earlier round. Every file you edit must be under it, never under ${ROOT}. Read the spec at ${SPEC}. When done, commit all your changes on that branch. ${HOOK_RULE}`
+    return `Your workspace is your copy ${where} (branch ${branch}), made in an earlier round. Every file you edit must be under it, never under ${ROOT}. Read the spec at ${SPEC}. When done, commit all your changes on that branch. ${HOOK_RULE} ${FLAKY_RULE}`
   }
   return `Other developers work on other criteria at the same time, so you work in your own copy of the project. First check that one can be made: ${ROOT} is the top of a git repository (\`[ "$(git -C "${ROOT}" rev-parse --show-toplevel)" = "$(cd "${ROOT}" && pwd -P)" ]\` succeeds). If not, change nothing, create nothing, and return a blocker starting with "${ISOLATION}" and the reason in a few French words.
 Otherwise create your copy from ${from === BASE ? `commit ${BASE}` : `branch ${from} (what is already merged)`}, whatever the branch the project is on — uncommitted changes in ${ROOT} are not part of it:
 \`${copyCommand(`g${g.id}`, from)}\`
 Work only in that copy: every file you edit must be under it, never under ${ROOT}. Read the spec at ${SPEC}: your copy may lack it or hold an older version.
 ${PREPARE}
-When done, commit all your changes on that branch (it is temporary: the run merges it, then removes the copy). ${HOOK_RULE} Return that copy as workspace and its branch as branch, even if you changed nothing. These checks and this copy are plumbing: never mention them in decisions.`
+When done, commit all your changes on that branch (it is temporary: the run merges it, then removes the copy). ${HOOK_RULE} ${FLAKY_RULE} Return that copy as workspace and its branch as branch, even if you changed nothing. These checks and this copy are plumbing: never mention them in decisions.`
 }
 
 const hasPassing = r => r.criteria.some(id => PASSING.includes((r.results[id] || {}).status))
@@ -1364,7 +1365,7 @@ ${list(broken, 'broken_criteria')}
 ${nudge}${feedbackFor(broken, history, leads)}
 ${changesHint(TARGET)}
 
-Work in the integration copy ${TARGET} (branch ${integ.branch}): every file you edit is under it, never under ${ROOT}. ${hadCopy ? '' : `If it lacks the project's dependencies (never prepared), prepare it first: ${PREPARE} `}When done, commit your changes on that branch. ${HOOK_RULE}
+Work in the integration copy ${TARGET} (branch ${integ.branch}): every file you edit is under it, never under ${ROOT}. ${hadCopy ? '' : `If it lacks the project's dependencies (never prepared), prepare it first: ${PREPARE} `}When done, commit your changes on that branch. ${HOOK_RULE} ${FLAKY_RULE}
 Fix only what broke. Re-run the reproductions and the tests of what you touched${quickTestCommand ? `, then \`${quickTestCommand}\` once` : ''}${SUBDIR ? ` from the copy's ${SUBDIR} folder` : ''} before returning; the full suite runs only ${FULL_SUITE_WHEN}.
 ${portRule(FINAL_SLOT + 90 + round)}${holdLine(locksFor(brokenIds))}
 Never run commands that rewrite files outside the broken criteria (repo-wide formatters, lockfile upgrades).
