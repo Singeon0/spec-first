@@ -14,6 +14,8 @@ Ce banc vérifie, à chaque version du plugin, qu'un orchestrateur qui lit SKILL
 
 Modifié le 07/11/2026 (1.9.0, D15) : les grilles et les consignes parlent de la revue (spec-first:review) au lieu du contrôle strict ; chaque situation modifiée porte une ligne « Modifié le 07/11/2026 » sous « Décisions en jeu ».
 
+Modifié le 24/11/2026 (1.11.0, D18) : situations 29 (réglage en cours de run, file des fusions) et 30 (batterie rapide en parallèle).
+
 Modifié le 23/11/2026 (décision d'Arthur) : trois passages par situation, notés à la majorité ; points acquis et barrière de sortie ; registre des rejets.
 
 ## Relancer le banc

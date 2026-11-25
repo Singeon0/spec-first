@@ -5,7 +5,7 @@ export const meta = {
   phases: [
     { title: 'Développement', detail: 'opus, one developer per group, a few groups at a time; medium, then high, then xhigh after each rejection, sorting each rejection first: a slip to fix or an approach to change' },
     { title: 'Critique', detail: 'opus high: tester, owner and maintainer judge each criterion blind to each other; after a rejection, only the critics that did not pass judge again' },
-    { title: 'Fusion', detail: 'opus high: each group with a passing criterion is merged into the integration branch as soon as it is done, one at a time, then its copy is removed; later groups and rework start from it' },
+    { title: 'Fusion', detail: 'opus high: each group with a passing criterion is merged into the integration branch as soon as it is done, one fusion at a time — the groups done meanwhile go together in the next one, tested once — then its copy is removed; later groups and rework start from it' },
     { title: 'Contrôle léger', detail: 'opus high, at the end of the run: a tester re-checks the run\'s criteria on the merged result when parts were combined, and the earlier criteria by a quick non-regression (plus an integrator when groups were combined); one developer repairs what broke' },
   ],
 }
@@ -274,6 +274,14 @@ if (input.groups != null && CRITERIA.length) {
 const GROUPS = groupIds.map((ids, i) => ({ id: String(i + 1), criteria: ids.map(id => byId[id]) }))
 // The groups a group waits for: those holding what its criteria depend on, earlier in the order.
 const groupNeeds = GROUPS.map((g, i) => [...new Set(g.criteria.flatMap(c => (DEPS[c.id] || []).map(d => GROUPS.findIndex(x => x.criteria.some(y => y.id === d)))))].filter(j => j >= 0 && j < i))
+// How many groups wait on each group, directly or not. Those go first — at a free slot, in the fusion
+// queue — and a group at least HUB others wait for starts its developer at high: it is on everyone's path.
+const HUB = 2
+const DOWNSTREAM = Object.fromEntries(GROUPS.map((g, i) => {
+  const seen = new Set(), stack = [i]
+  while (stack.length) { const j = stack.pop(); GROUPS.forEach((x, k) => { if (groupNeeds[k].includes(j) && !seen.has(k)) { seen.add(k); stack.push(k) } }) }
+  return [g.id, seen.size]
+}))
 
 // Every agent gets its own ten ports, from its group, its role and its round — never from the order
 // agents finish in — so a resumed run (resumeFromRunId) gives each agent the same prompt again.
@@ -391,13 +399,14 @@ const FUSION_SCHEMA = {
   properties: {
     workspace: { type: 'string', description: 'absolute path of the integration copy' },
     branch: { type: 'string', description: 'branch of the integration copy' },
-    integrated: { type: 'boolean', description: 'true if the group\'s work is now committed on the integration branch' },
-    removed: { type: 'boolean', description: 'true if the group\'s copy and branch were then removed' },
+    integrated: { type: 'boolean', description: 'true if every group of this fusion is now committed on the integration branch' },
+    notIntegrated: { type: 'array', items: { type: 'object', properties: { group: { type: 'string' }, reason: { type: 'string', description: 'why not, in a few French words' } }, required: ['group', 'reason'] }, description: 'the groups of this fusion not merged; empty if integrated' },
+    removed: { type: 'boolean', description: 'true if the copy and branch of every merged group were then removed' },
     reason: { type: 'string', description: 'empty if integrated; otherwise why not, in a few French words' },
     conflicts: { type: 'array', items: { type: 'string' }, description: 'each conflict and how it was resolved, in plain words' },
     tests: { type: 'string', description: 'test command run and its outcome. ' + PROOF_CAP },
   },
-  required: ['workspace', 'branch', 'integrated', 'removed', 'reason', 'conflicts', 'tests'],
+  required: ['workspace', 'branch', 'integrated', 'notIntegrated', 'removed', 'reason', 'conflicts', 'tests'],
 }
 
 const COPY_SCHEMA = {
@@ -846,7 +855,9 @@ Your criteria build on criteria ${needs.join(', ')}, done elsewhere: they are al
   const KEYS = env ? env.critics : IN_RUN
   const slotOf = (k, round) => 3 + 3 * round + IN_RUN.indexOf(k)
   if (env) log(`${tag} : réparation ciblée du critère ${ids[0]} (défaut d'environnement) — rejugé par : ${KEYS.map(k => defs[k].label).join(', ')}`)
-  const start = Math.max(0, ...ids.map(id => DEV_EFFORTS.indexOf(START[id] || DEV_EFFORTS[0])))
+  const hub = (DOWNSTREAM[g.id] || 0) >= HUB
+  const start = Math.max(hub ? 1 : 0, ...ids.map(id => DEV_EFFORTS.indexOf(START[id] || DEV_EFFORTS[0])))
+  if (hub && start === 1 && !ids.some(id => START[id])) log(`${tag} : ${DOWNSTREAM[g.id]} groupes en dépendent, son développeur part en high`)
   // Every group starts from the integration branch: what is already merged.
   const from = integ.branch || FROM
   let pending = g.criteria.slice()
@@ -1043,62 +1054,95 @@ ${changesHint(where)}${mergedIn ? ' Work merged into this copy before (other gro
   return r
 }
 
-// ================================================================= 2. fusion, group by group
+// ================================================================= 2. fusion, in batches
 // A group with a validated or unverified criterion is merged as soon as it is done, into one
-// integration branch, one fusion at a time; later groups and rework start from it. The fusion
-// brings in what the critics judged, drops only the closed list DROP, then removes the group's copy.
-// A criterion is never validated if its work is not merged. A fusion that fails is a technical block.
-let fuseTail = Promise.resolve()
+// integration branch, one fusion at a time; later groups and rework start from it. The groups that
+// finish while a fusion runs wait, then go together in the next one (at most FUSE_BATCH), merged
+// one after the other and tested once: the queue drains by batch, not by group. The groups others
+// wait for go first. The fusion brings in what the critics judged, drops only the closed list DROP,
+// then removes the merged copies. A criterion is never validated if its work is not merged. A fusion
+// that fails is a technical block.
+const FUSE_BATCH = 4
+const fuseWaiting = []
+let fusing = null
 function fuseQueued(r) {
-  const p = fuseTail.then(() => fuse(r)).catch(() => {
-    keepBlocked(r, `Non intégré — la fusion s'est arrêtée sur une erreur ; travail conservé sur la branche ${r.branch}.`)
-    r.fusionFailed = "l'intégrateur s'est arrêté sur une erreur"
-    log(`Fusion : groupe ${r.group} non intégré (erreur)`)
+  return new Promise(done => {
+    fuseWaiting.push({ r, done })
+    if (!fusing) fusing = pumpFusions()
   })
-  fuseTail = p
-  return p
 }
+async function pumpFusions() {
+  while (fuseWaiting.length) {
+    // Stable sort: the groups most others wait for first, the others in the order they finished.
+    const order = fuseWaiting.map((x, k) => [x, k]).sort((a, b) => (DOWNSTREAM[b[0].r.group] || 0) - (DOWNSTREAM[a[0].r.group] || 0) || a[1] - b[1])
+    const batch = order.slice(0, FUSE_BATCH).map(x => x[0])
+    for (const x of batch) fuseWaiting.splice(fuseWaiting.indexOf(x), 1)
+    try {
+      await fuse(batch.map(x => x.r))
+    } catch (e) {
+      for (const { r } of batch) {
+        if (r.integrated) continue
+        keepBlocked(r, `Non intégré — la fusion s'est arrêtée sur une erreur ; travail conservé sur la branche ${r.branch}.`)
+        r.fusionFailed = "l'intégrateur s'est arrêté sur une erreur"
+        log(`Fusion : groupe ${r.group} non intégré (erreur)`)
+      }
+    }
+    for (const x of batch) x.done()
+  }
+  fusing = null
+}
+// Settled once nothing waits and nothing merges.
+async function fusionsDone() { while (fusing) await fusing }
 
-async function fuse(r) {
-  if (overBudget(`la fusion du groupe ${r.group}`)) {
-    keepBlocked(r, `Non intégré — ${stopped} ; travail conservé sur la branche ${r.branch}.`)
+async function fuse(rs) {
+  if (overBudget(`la fusion ${plural(rs, 'du groupe', 'des groupes')} ${rs.map(r => r.group).join(', ')}`)) {
+    for (const r of rs) keepBlocked(r, `Non intégré — ${stopped} ; travail conservé sur la branche ${r.branch}.`)
     return
   }
   if (!integ.where) {
-    keepBlocked(r, `Non intégré — pas de copie d'intégration ; travail conservé sur la branche ${r.branch}.`)
+    for (const r of rs) keepBlocked(r, `Non intégré — pas de copie d'intégration ; travail conservé sur la branche ${r.branch}.`)
     return
   }
-  // The prompt depends only on this group and on the integration copy, never on which groups were
-  // merged before: a resumed run asks the same, and a fusion already done is recognised, not redone.
-  const res = await ask(`You are the integrator. Developers work in parallel, each in its own git worktree of the project at ${ROOT}. Each group the critics validated is merged, as soon as it is done, into one integration branch; later groups and rework start from it. Merge group ${r.group} now.
+  // The prompt depends only on these groups and on the integration copy, never on which groups were
+  // merged before: a resumed run that forms the same batch asks the same, and a merge already done is
+  // recognised by step 0, not redone.
+  const names = rs.map(r => r.group).join(', ')
+  const many = rs.length > 1
+  const locks = locksFor(rs.flatMap(r => r.criteria))
+  const res = await ask(`You are the integrator. Developers work in parallel, each in its own git worktree of the project at ${ROOT}. Each group the critics validated is merged into one integration branch; later groups and rework start from it. ${many ? `Merge groups ${names} now, one after the other, in this order, then test once.` : `Merge group ${names} now.`}
 
 Spec: ${SPEC}
-Group ${r.group}: worktree ${r.where}, branch ${r.branch}, statuses ${r.criteria.map(id => `${id}=${r.results[id].status}`).join(', ')}
-${list(r.criteria.map(id => byId[id]))}
-The integration copy is ${integ.where} (branch ${integ.branch}). Return its path as workspace and its branch as branch. The groups merged before this one are on that branch (\`git -C ${integ.where} log --oneline --merges\`): they must keep working.
+${rs.map(r => `Group ${r.group}: worktree ${r.where}, branch ${r.branch}, statuses ${r.criteria.map(id => `${id}=${r.results[id].status}`).join(', ')}
+${list(r.criteria.map(id => byId[id]))}`).join('\n')}
+The integration copy is ${integ.where} (branch ${integ.branch}). Return its path as workspace and its branch as branch. The groups merged before are on that branch (\`git -C ${integ.where} log --oneline --merges\`): they must keep working.
 
-0. Already merged? \`git -C ${integ.where} log --format=%s | grep -F "${r.branch}"\` prints a line → this group is already on the integration branch (a resumed run): integrated true, do step 5 if its copy or branch still exist, nothing else. Its worktree ${r.where} is gone but its branch exists → do steps 1, 3, 4 and 5 without step 2.
 1. The integration copy lacks the project's dependencies (fresh, never prepared) → prepare it first. ${PREPARE}
-2. Make the group's branch hold exactly what its critics judged, in ${r.where}:
-   - stage everything: \`git -C ${r.where} add -A\`
-   - check the list \`git -C ${r.where} diff --cached --name-only ${BASE}\` and drop ${DROP} — with \`git -C ${r.where} restore --staged --source=${BASE} -- <path>\` (drops it even if the developer committed it). Everything else staged is the group's work: keep it.
-   - something staged → \`git -C ${r.where} commit -m "spec-first : groupe ${r.group}"\`
-3. Merge it: \`git -C ${integ.where} merge --no-ff --no-edit ${r.branch}\`. Conflict → resolve the markers so this group's criteria and the merged groups' all still hold (read both sides, keep both intents), then \`git add\` and \`git commit --no-edit\`. Never run \`reset\`, \`rebase\`, \`stash\`, \`checkout\` or \`cherry-pick\` in the integration copy: they can wipe groups already merged. Cannot finish the merge → \`git -C ${integ.where} merge --abort\`, so the integration copy stays as it was.
-4. A dependency came in → install it in the integration copy the usual way. Run only the tests covering this group's criteria and the files the merge touched${quickTestCommand ? `, then \`${quickTestCommand}\` once` : ''} — from ${SUBDIR ? `the copy's ${SUBDIR} folder` : 'the integration copy'}; the full suite runs only ${FULL_SUITE_WHEN}. Fix what the merge broke — only that — and commit the fix. Commit hooks always run, never --no-verify; one fails for a reason outside the merge → the cause in reason (integrated stays true only if the merge commit is on the integration branch).
-5. Merged and committed → remove the group's copy, no longer needed: \`git -C ${ROOT} worktree remove --force ${r.where}\` (refused, e.g. submodules → \`rm -rf ${r.where} && git -C ${ROOT} worktree prune\`), \`git -C ${ROOT} branch -D ${r.branch}\`, then \`rmdir "$(dirname ${r.where})"\`; removed true. Not merged → leave it in place. Leave every other copy and branch alone. Never edit ${ROOT}'s own files or switch its branch. Cannot merge → integrated false and the reason.
-${portRule(groupSlot(r.group, 12))}${holdLine(locksFor(r.criteria))}
+2. For each group${many ? ', in the order above' : ''} (<wt> its worktree, <br> its branch):
+   a. Already merged? \`git -C ${integ.where} log --format=%s | grep -F "<br>"\` prints a line → it is already on the integration branch (a resumed run): nothing to merge, only step 4 if its copy or branch still exist. Its worktree is gone but its branch exists → skip b.
+   b. Make its branch hold exactly what its critics judged, in <wt>: stage everything (\`git -C <wt> add -A\`), check the list \`git -C <wt> diff --cached --name-only ${BASE}\` and drop ${DROP} — with \`git -C <wt> restore --staged --source=${BASE} -- <path>\` (drops it even if the developer committed it). Everything else staged is the group's work: keep it. Something staged → \`git -C <wt> commit -m "spec-first : groupe <N>"\`.
+   c. Merge it: \`git -C ${integ.where} merge --no-ff --no-edit <br>\` — one merge commit per group. Conflict → resolve the markers so this group's criteria and those of every group merged before it${many ? ' (in this batch too)' : ''} all still hold (read both sides, keep both intents), then \`git add\` and \`git commit --no-edit\`. Never run \`reset\`, \`rebase\`, \`stash\`, \`checkout\` or \`cherry-pick\` in the integration copy: they can wipe groups already merged. Cannot finish the merge → \`git -C ${integ.where} merge --abort\`, so the integration copy stays as it was${many ? ', list the group in notIntegrated with the reason, and go on with the next' : ''}.
+3. A dependency came in → install it in the integration copy the usual way. ${many ? 'Once every group of the batch is merged, run' : 'Run'} only the tests covering ${many ? "these groups' criteria" : "this group's criteria"} and the files the merges touched${quickTestCommand ? `, then \`${quickTestCommand}\` once${many ? ' for the whole batch — never once per group' : ''}` : ''} — from ${SUBDIR ? `the copy's ${SUBDIR} folder` : 'the integration copy'}; the full suite runs only ${FULL_SUITE_WHEN}. Fix what the merges broke — only that — and commit the fix. Commit hooks always run, never --no-verify; one fails for a reason outside the merges → the cause in reason (a group stays merged only if its merge commit is on the integration branch).
+4. Each group merged and committed → remove its copy, no longer needed: \`git -C ${ROOT} worktree remove --force <wt>\` (refused, e.g. submodules → \`rm -rf <wt> && git -C ${ROOT} worktree prune\`), \`git -C ${ROOT} branch -D <br>\`, then \`rmdir "$(dirname <wt>)"\`. removed: true when every merged group's copy is gone. A group not merged → leave its copy in place. Leave every other copy and branch alone. Never edit ${ROOT}'s own files or switch its branch.
+integrated: true only if every group above is on the integration branch; a group that is not → in notIntegrated, with why (integrated false).
+${portRule(groupSlot(rs[0].group, 12))}${holdLine(locks)}
 
-${COMMON_RULES}`, { ...FUSION, schema: FUSION_SCHEMA, phase: 'Fusion', label: `Fusion groupe ${r.group} (${FUSION.model} ${FUSION.effort})`, locks: locksFor(r.criteria) })
-  if (res) fusions.push({ group: r.group, integrated: !!res.integrated, reason: res.reason, conflicts: res.conflicts, tests: res.tests })
-  if (res && res.integrated) {
-    r.integrated = true
-    r.removed = !!res.removed
-    integratedGroups.push(r)
-    log(`Fusion : groupe ${r.group} intégré (${integratedGroups.length} au total)${(res.conflicts || []).length ? `, ${res.conflicts.length} conflit(s) résolu(s)` : ''}${r.removed ? ', copie supprimée' : ''}`)
-  } else {
-    keepBlocked(r, `Non intégré — travail conservé sur la branche ${r.branch}.${res ? (res.reason ? ` ${res.reason}` : '') : " L'intégrateur n'a pas répondu, deux fois."}`)
-    r.fusionFailed = res ? (res.reason || 'conflit non résolu') : "l'intégrateur n'a pas répondu"
-    log(`Fusion : groupe ${r.group} non intégré, copie conservée`)
+${COMMON_RULES}`, { ...FUSION, schema: FUSION_SCHEMA, phase: 'Fusion', label: `Fusion ${plural(rs, 'groupe', 'groupes')} ${names} (${FUSION.model} ${FUSION.effort})`, locks })
+  const notIn = new Map(((res && res.notIntegrated) || []).map(x => [String(x.group), x.reason || '']))
+  for (const r of rs) {
+    // integrated false with no group named: none is taken as merged.
+    const ok = !!res && (res.integrated || (notIn.size > 0 && !notIn.has(r.group)))
+    const why = notIn.get(r.group) || (res && res.reason) || ''
+    if (res) fusions.push({ group: r.group, ...(many && { batch: names }), integrated: ok, reason: ok ? '' : why, conflicts: res.conflicts, tests: res.tests })
+    if (ok) {
+      r.integrated = true
+      r.removed = !!res.removed
+      integratedGroups.push(r)
+      log(`Fusion : groupe ${r.group} intégré${many ? ` (lot ${names})` : ''} (${integratedGroups.length} au total)${(res.conflicts || []).length ? `, ${res.conflicts.length} conflit(s) résolu(s) dans la fusion` : ''}${r.removed ? ', copie supprimée' : ''}`)
+    } else {
+      keepBlocked(r, `Non intégré — travail conservé sur la branche ${r.branch}.${res ? (why ? ` ${why}` : '') : " L'intégrateur n'a pas répondu, deux fois."}`)
+      r.fusionFailed = res ? (why || 'conflit non résolu') : "l'intégrateur n'a pas répondu"
+      log(`Fusion : groupe ${r.group} non intégré, copie conservée`)
+    }
   }
 }
 
@@ -1114,11 +1158,12 @@ const stoppedGroup = (g, status, reason) => ({
 const settled = GROUPS.map(() => false)
 const groupDone = GROUPS.map((x, i) => { let settle; const p = new Promise(r => { settle = () => { settled[i] = true; r() } }); return { p, settle } })
 const started = GROUPS.map(() => false)
-// The next group whose dependencies are all settled, in the order; none ready → wait for one to settle.
+// The next group whose dependencies are all settled; none ready → wait for one to settle.
 async function nextReady() {
   for (;;) {
-    const i = GROUPS.findIndex((g, k) => !started[k] && groupNeeds[k].every(j => settled[j]))
-    if (i >= 0) { started[i] = true; return i }
+    // Among the ready groups, the one most others wait for; ties keep the order.
+    const ready = GROUPS.map((g, k) => k).filter(k => !started[k] && groupNeeds[k].every(j => settled[j]))
+    if (ready.length) { const i = ready.reduce((a, k) => DOWNSTREAM[GROUPS[k].id] > DOWNSTREAM[GROUPS[a].id] ? k : a); started[i] = true; return i }
     const left = GROUPS.map((g, k) => k).filter(k => !started[k])
     if (!left.length) return -1
     const awaited = [...new Set(left.flatMap(k => groupNeeds[k]).filter(j => !settled[j]))]
@@ -1151,7 +1196,7 @@ async function worker() {
 if (integFailed) GROUPS.forEach((g, i) => { groupResults[i] = stoppedGroup(g, 'blocked', integFailed) })
 else if (GROUPS.length) await parallel(Array.from({ length: Math.min(MAX_GROUPS, GROUPS.length) }, () => () => worker()))
 GROUPS.forEach((g, i) => { if (!groupResults[i]) groupResults[i] = stoppedGroup(g, 'crashed', "le groupe s'est arrêté sur une erreur (panne)") })
-await fuseTail
+await fusionsDone()
 
 // A failed fusion never stops the run: the group is developed once more from the integration branch,
 // which already holds the other groups' work, bringing in its judged branch, then judged and merged again.
@@ -1174,7 +1219,7 @@ await fuseTail
     }
   }))
   for (const a of retried || []) if (a && a.where) groupResults.push({ ...a, results: {} })
-  await fuseTail
+  await fusionsDone()
 }
 
 // No group copy stays in the project for the check that ends the run: its folders (.venv, node_modules)

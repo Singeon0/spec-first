@@ -132,6 +132,19 @@ test('developers read a file once and keep notes for after a compaction; a findi
   assert.ok(JSON.parse(reviewer.schemaText).properties.findings.items.properties.where, 'findings carry "where"')
 })
 
+// Speed (24/11/2026, QualiSpectra on seglab-hsi-dev): fusions one by one made a 30-minute queue while
+// developer slots sat idle. The groups done while a fusion runs go together in the next one, tested
+// once; the groups others wait for go first, and one at least two groups wait for starts at high.
+test('waiting groups are merged together and tested once; a group others wait for starts at high', () => {
+  const calls = variants['run, happy path']
+  const batch = calls.find(c => /^Fusion groupes /.test(c.label))
+  assert.ok(batch, 'a batch fusion')
+  assert.ok(batch.prompt.includes(`\`${RUN.quickTestCommand}\` once for the whole batch — never once per group`), batch.label)
+  assert.ok(JSON.parse(batch.schemaText).properties.notIntegrated, 'notIntegrated in the fusion schema')
+  assert.match(calls.find(c => c.label.startsWith('Groupe 1 — dév essai 1')).label, /\(opus high\)/)
+  assert.match(calls.find(c => c.label.startsWith('Groupe 4 — dév essai 1')).label, /\(opus medium\)/)
+})
+
 // Verification rules (24/11/2026): a change must not weaken the tests that judge it, a flaky test is
 // never worked around, and a criterion stated as a property is tried on generated inputs.
 test('tests are protected: weakened tests are a defect, a flaky test is never worked around', () => {
