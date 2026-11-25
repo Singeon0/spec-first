@@ -65,9 +65,9 @@ size, whatever the number of criteria:
 | Two live testers, whatever the size of the spec: they start the real result and drive it with Chrome DevTools along user journeys that cover every criterion, each in its own isolated browser context; the first runs the full suite once | Opus xhigh |
 | Merging duplicate findings | Opus high |
 | One live tester tries the reviewers' unproven leads | Opus xhigh |
-| One developer repairs every proven blocking or major defect, in one batch; only the reviewer that raised each one re-judges it, plus a live replay by the criterion's tester — three rounds at most | Opus xhigh |
+| One developer repairs every proven blocking or major defect, in one batch; only the reviewer that raised each one re-judges it, plus a replay by the criterion's tester (the replay scripts first, live where one fails or where the repair reaches) — three rounds at most | Opus xhigh |
 
-Minor defects are reported, never repaired. A criterion the review still
+Minor defects are reported in one line, never proven, never repaired. A criterion the review still
 rejects goes back to a development run (`rejectedBy` from the review's
 `relaunch`), then to the review with `focus`: only the reviewers that
 rejected it judge again, with a live replay — never the full panel twice.

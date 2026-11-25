@@ -252,8 +252,8 @@ every criterion of the spec passes → REVIEW (spec-first:review), once per spec
   6 reviewers, one angle each (owner · reliability · security · performance · integration and maintenance · usage)
   + 2 live testers (Chrome DevTools, user journeys covering every criterion), all xhigh, blind to each other
   → duplicates merged → unproven leads tried live by one tester
-  → one developer repairs every proven blocking or major defect, in one batch (xhigh, every round)
-  → only the reviewer that raised each defect re-judges it + a live replay — three rounds at most; minor defects reported, never repaired
+  → one developer repairs every proven blocking or major defect, in one batch (xhigh, every round) — a mistake made in several places is fixed everywhere at once
+  → only the reviewer that raised each defect re-judges it + a replay: the replay scripts first, the browser only where one fails or where the repair reaches (everything live on the third round) — three rounds at most; minor defects reported in one line, never proven, never repaired
   → passes → the publication his go authorized
 ```
 
@@ -296,10 +296,11 @@ every criterion of the spec passes → REVIEW (spec-first:review), once per spec
 - `workspace`, `branch`: the last run's `result.worktree` and `result.branch` · result already in the tree → omit both: the review makes its own copy from HEAD (commit « étape N » first)
 - `testCommand`: the full suite — run once by the first live tester, and once more after the last repair · `exclusive`: `{resource: [ids]}` — a live tester holds only what its criteria need
 - the panel is fixed (his decision): six reviewers and two live testers, whatever the size of the spec — never fewer to save tokens
+- replay scripts (1.12.0): each live verdict and each blocking or major defect leaves a script under `.spec-first/harness/<specId>/replay/` (exit 0 = the behaviour is right), built from what the project already has — never a tool installed for it, never a weaker check than the one made by hand; the repair developer runs them and never edits one · after a repair they run first: a failing one → not repaired, or a regression looked at live; a criterion without a script is replayed live only where the repair reaches, all of them on the third round · the review gets cheaper this way, never by a smaller panel, a lower effort or a skipped replay
 - `focus`: the review report's `focus` (every open defect, general ones included), after the run that relaunched those criteria → only those reviewers + a live replay, never the full panel
 - `publish`: the external actions his go authorized and he confirmed — an action still waiting for his yes stays out of it (the review pushes the branch for the CI at its very start) · applied only once the review passes and the CI is green on that very commit, checked from outside · « standard »: the CI starts with the review (full or `focus`), its failures join the repair · « rapide »: the CI runs once, at the publication
 - `waitRound`, `waitAt`: resuming after an external wait — the report's `waiting.waitRound` and `waiting.waitAt`, with `resumeFromRunId` and otherwise the same args (§4): only the read that was waiting runs again
-- report: `pass` · `criteria` · `open` (proven blocking or major defects still open) · `repaired` · `minor` (reported, never repaired) · `relaunch` · `focus` · `silent` · `waiting` · `publication` · `result` (the branch to squash)
+- report: `pass` · `criteria` · `open` (proven blocking or major defects still open) · `repaired` · `minor` (one line each, never proven, never repaired) · `replayScripts` (how many criteria have a replay script) · `relaunch` · `focus` · `silent` · `waiting` · `publication` · `result` (the branch to squash)
 - `silent` not empty (a reviewer never answered) → `pass: false`: resume it at once, `resumeFromRunId` and the same args — the others come back from cache; never a pass without all six angles
 
 **Criteria that build on others (« socle ») → one run, in waves** (the goal covers it)
@@ -337,7 +338,7 @@ It runs in the background → wait (§4) until it returns. It returns `{error}` 
 - found beyond the spec (task wider than planned, neighbouring problem) → never added to this run → second spec (§8)
 
 One-sentence spec (small reversible task, §4) → no workflow: one Opus medium sub-agent does it, one Opus high tester checks it.
-Workflow tool unavailable or failing → same roles via the Agent tool, under the same rules: same models and efforts (`subagent_type` = the profile named after the role's model and effort, e.g. `opus-xhigh` — never `general-purpose`), the three critics launched in one message, escalation, fusion, dependencies in waves, a light check ending each run and the review panel (six reviewers, two live testers) once per spec, external waits watched by you, never by an agent.
+Workflow tool unavailable or failing → same roles via the Agent tool, under the same rules: same models and efforts (`subagent_type` = the profile named after the role's model and effort, e.g. `opus-xhigh` — never `general-purpose`), the three critics launched in one message, escalation, fusion, dependencies in waves, a light check ending each run and the review panel (six reviewers, two live testers) once per spec with its own economy (replay scripts run first after a repair, minor findings in one line, a mistake fixed everywhere in one round), external waits watched by you, never by an agent.
 
 ## 8. The end: clean up, say it's done, stop
 
@@ -351,7 +352,7 @@ criteria pass → commit « spec : <nom> » → clean-up sub-agent → commit «
 1. « spec : <nom> »: the result (`merge --squash` of `result.branch` when `in: "integration"`, §7) + the ticked spec; you make it.
    - the publication merged the result into a remote branch (`publication.done`, its `steps` show the merge request merged — `ci.mergeRequest` is its link) → no squash: bring his branch to it (`git pull --ff-only`), then the ticked spec alone in the commit · fast-forward impossible → stop point, never a force · the pushed branch stays on the remote unless his go listed its removal
 2. « nettoyage : <nom> »: one Opus medium sub-agent, given the project root, the spec, the « spec » commit, the `copies` of every run of this spec, the files this conversation created. Job: repository as clean as if done in one go, in a commit that can be undone on its own:
-   - unasked: the `copies` with `integrated: true` of every run of this spec — its integration copies (`group: "intégration"`, once squashed; merged group copies are already gone) —, every orphan copy or branch of this spec (named after `specId` in the report: `spec-first-<specId>--…`, `.spec-first/copies/<specId>--…`; left by an interrupted run, in no report), its state file (`.spec-first/copies/<specId>--etat.md`) and its logs (`.spec-first/logs/<specId>-*`) — `git worktree remove --force`, `git branch -D`, then the empty folder
+   - unasked: the `copies` with `integrated: true` of every run of this spec — its integration copies (`group: "intégration"`, once squashed; merged group copies are already gone) —, every orphan copy or branch of this spec (named after `specId` in the report: `spec-first-<specId>--…`, `.spec-first/copies/<specId>--…`; left by an interrupted run, in no report), its state file (`.spec-first/copies/<specId>--etat.md`), its logs (`.spec-first/logs/<specId>-*`) and its launch recipe and replay scripts (`.spec-first/harness/<specId>`) — `git worktree remove --force`, `git branch -D`, then the empty folder
    - delete the temporary files, probes, logs and scratch files this conversation created
    - remove what the merged change made useless: dead code, replaced files, scripts and docs about behaviour that no longer exists
    - run the project tests afterwards; put back any removal that breaks them

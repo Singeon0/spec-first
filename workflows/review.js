@@ -1,11 +1,11 @@
 export const meta = {
   name: 'review',
-  description: 'spec-first review, once per spec, separate from the development run: a fixed panel whatever the spec size — six reviewers in xhigh, each with one angle (owner, reliability, security, performance, integration and maintenance, usage), reading the whole spec and every commit of it, and two live testers in xhigh who run the real result and drive it with Chrome DevTools along user journeys covering every criterion; duplicates merged, unproven leads tried live by one tester; one developer repairs every proven blocking or major defect in one batch, re-judged only by the reviewer that raised each one and a live replay of its scenario, three repair rounds at most; then, only if the owner authorized it with his go, the external actions he listed (push, merge request, CI, merge, tag, release), checked from outside; profil « rapide »: Sonnet',
+  description: 'spec-first review, once per spec, separate from the development run: a fixed panel whatever the spec size — six reviewers in xhigh, each with one angle (owner, reliability, security, performance, integration and maintenance, usage), reading the whole spec and every commit of it, and two live testers in xhigh who run the real result and drive it with Chrome DevTools along user journeys covering every criterion; duplicates merged, unproven leads tried live by one tester; one developer repairs every proven blocking or major defect in one batch, re-judged only by the reviewer that raised each one and a replay of its scenario (its replay script first, live where the repair reaches), three repair rounds at most; then, only if the owner authorized it with his go, the external actions he listed (push, merge request, CI, merge, tag, release), checked from outside; profil « rapide »: Sonnet',
   whenToUse: 'Called by the spec-first skill once every criterion of the spec passed the development runs (spec-first:run), or alone when the owner asks for a review. args: { specPath, projectRoot, baseCommit, criteria: [{ id, text }], specBrief?, workspace?, branch?, testCommand?, quickTestCommand?, setupCommand?, subdir?, exclusive?: [string] | { [resource]: [ids] }, publish?: { actions: string, criteria: [ids] }, profil?: "standard"|"rapide", focus?: [{ id?, reviewer, finding }], waitRound?: number, waitAt?: { [read]: number }, budget?: number } with absolute paths. baseCommit: the commit the spec started from (the baseCommit of its first run) — every reviewer reads the whole diff from it. criteria: every criterion of the spec. workspace + branch: where the result lives — the run report\'s result.worktree and result.branch when result.in is "integration"; omitted → a review copy is made from the project\'s HEAD (commit the work first). Repairs are committed on that branch, never on the owner\'s. focus: a targeted re-review after a criterion was relaunched in a development run — only the reviewers named judge again, only those findings, plus a live replay by the testers; no full panel — the report\'s focus field gives it ready-made for every open defect. A reviewer that never answered → silent in the report, pass false: resume with resumeFromRunId and the same args. A remote pipeline, a registry, a human review still running → returns « waiting »: resume with resumeFromRunId, the same args, and waitRound and waitAt from the report. budget: output tokens, the review stops cleanly before it. Not for a bare slash-command call without args: tell the user to run /spec-first instead.',
   phases: [
     { title: 'Revue', detail: 'six reviewers in xhigh, one angle each, on the whole spec and every commit; two live testers in xhigh driving the real result with Chrome DevTools, by user journeys' },
     { title: 'Pistes', detail: 'duplicates merged; unproven leads tried live by one tester' },
-    { title: 'Réparation', detail: 'one developer repairs every proven blocking or major defect in one batch (xhigh); only the reviewer that raised each one re-judges it, plus a live replay — three rounds at most' },
+    { title: 'Réparation', detail: 'one developer repairs every proven blocking or major defect in one batch (xhigh); only the reviewer that raised each one re-judges it, plus a replay: the replay scripts first, live where the repair reaches — three rounds at most' },
     { title: 'Publication', detail: 'only with the owner\'s authorization: the external actions he listed, never waiting on something outside the machine; a tester in xhigh checks each publication criterion from outside' },
   ],
 }
@@ -174,7 +174,14 @@ const suitePath = name => `${ROOT}/.spec-first/logs/${SPEC_ID}-revue-${ARGS_TAG}
 // One launch recipe per spec for every live tester, kept between rounds and reviews (kipp, 1.9.2:
 // each tester rebuilt the server, its seeding and its reproduction scripts).
 const HARNESS = `${ROOT}/.spec-first/harness/${SPEC_ID}`
-const HARNESS_RULE = `Launch recipe: ${HARNESS}/launch.sh <port> (start, seed, print the URL) — it exists → use it, fix it there if it fails; absent → write it once the result runs. Keep your reproduction scripts there, named in your proofs: the re-judgement reruns them.`
+const HARNESS_RULE = `Launch recipe: ${HARNESS}/launch.sh <port> (start, seed, print the URL) — it exists → use it, fix it there if it fails; absent → write it once the result runs.`
+// Replay scripts: a check that runs again without a model session. After a repair they run first; the
+// browser opens only where one fails, or where none exists and the repair reaches (QualiSpectra,
+// 10/11/2026: the testers' replays after two repairs cost 16 % of the review, 100 to 130 calls each).
+const REPLAY_DIR = `${HARNESS}/replay`
+const REPLAY_RULE = `Replay scripts: ${REPLAY_DIR}/<name>.sh <url> — one check that runs again without you, against the instance launch.sh started (its URL as only argument; a CLI or a library ignores it): exit 0 when the behaviour is right, any other code when it is wrong, the decisive line printed. Built from what the project already has (API calls, its CLI, its test tools, its browser automation when it has one) — never install a tool for it, and never a weaker check than the one you made by hand.`
+// A replay path an agent returned: kept only when it is a plain file name under REPLAY_DIR.
+const replayOf = p => { const s = String(p || '').trim(); return s.startsWith(`${REPLAY_DIR}/`) && /^[A-Za-z0-9._-]+$/.test(s.slice(REPLAY_DIR.length + 1)) && !s.includes('..') ? s : '' }
 const suiteCommand = (at, file, cmd) => `${ENSURE_HIDDEN} && mkdir -p .spec-first/logs && rm -f "${file}" && (cd "${at}" && ${cmd}) > "${file}" 2>&1; echo "EXIT $?" >> "${file}"`
 const PREPARE = setupCommand
   ? `run \`${setupCommand}\` from ${SUBDIR ? `its ${SUBDIR} folder` : 'its root'}.`
@@ -248,9 +255,10 @@ const FINDING = {
     kind: { type: 'string', enum: ['defect', 'lead'], description: 'defect: proven by a reproduction or a measurement; lead: a suspicion you could not prove' },
     severity: { type: 'string', enum: ['blocking', 'major', 'minor'], description: 'blocking: a criterion does not hold, data loss, a security hole; major: real harm in normal use; minor: polish, style, a rare edge case' },
     title: { type: 'string', description: 'one line, in French' },
-    proof: { type: 'string', description: 'defect: the exact reproduction (command and output, or steps and observed behaviour). lead: what makes you suspect it, written as a scenario a live tester can try. ' + PROOF_CAP },
+    proof: { type: 'string', description: 'defect: the exact reproduction (command and output, or steps and observed behaviour). lead: what makes you suspect it, written as a scenario a live tester can try. minor: the place, one line, no reproduction. ' + PROOF_CAP },
     cause: { type: 'string', enum: ['code', 'environment'] },
-    where: { type: 'string', description: 'defect: the file and function it sits in, when you found it — one line' },
+    where: { type: 'string', description: 'defect: the file and function it sits in, when you found it — one line; the same mistake in several places: every place you saw' },
+    replay: { type: 'string', description: 'blocking or major defect: the path of its replay script (exit 0 once the defect is gone); empty when none can be written, for a minor finding and for a lead' },
   },
   required: ['criterion', 'kind', 'severity', 'title', 'proof'],
 }
@@ -268,10 +276,16 @@ const VERDICT = {
   },
   required: ['verdict', 'proof'],
 }
-const testerSchema = cids => ({
+// The panel's live testers also give each criterion's replay script (the publication tester does not).
+const VERDICT_LIVE = {
+  type: 'object',
+  properties: { ...VERDICT.properties, replay: { type: 'string', description: 'pass or defect: the path of the replay script of this criterion; empty only when eyes or a real pointer alone can judge it (the proof says why), or when it is unverifiable' } },
+  required: ['verdict', 'proof', 'replay'],
+}
+const testerSchema = (cids, live) => ({
   type: 'object',
   properties: {
-    verdicts: { type: 'object', properties: Object.fromEntries(cids.map(id => [id, VERDICT])), required: cids, additionalProperties: false },
+    verdicts: { type: 'object', properties: Object.fromEntries(cids.map(id => [id, live ? VERDICT_LIVE : VERDICT])), required: cids, additionalProperties: false },
     findings: { type: 'array', items: FINDING, description: 'what you met beyond your criteria\' verdicts: console errors, broken flows, slowness, leads you tried' },
     outsideSpec: OUTSIDE,
   },
@@ -302,7 +316,7 @@ const LEADS_SCHEMA = {
       type: 'array',
       items: {
         type: 'object',
-        properties: { n: { type: 'integer' }, outcome: { type: 'string', enum: ['proven', 'dismissed', 'unverifiable'] }, proof: { type: 'string', description: PROOF_CAP } },
+        properties: { n: { type: 'integer' }, outcome: { type: 'string', enum: ['proven', 'dismissed', 'unverifiable'] }, proof: { type: 'string', description: PROOF_CAP }, replay: { type: 'string', description: 'proven: the path of its replay script; otherwise empty' } },
         required: ['n', 'outcome', 'proof'],
       },
     },
@@ -445,28 +459,34 @@ const suiteCmd = testCommand || quickTestCommand
 const pubNote = PUBLISH ? `
 Criteria ${PUBLISH.ids.join(', ')} are publication criteria: their external part (pushed, merged, tagged, published) happens after this review, with the owner's authorization. Judge everything else they need; never a defect only because it is not published yet.` : ''
 
+// The six prompts are the same text up to « YOUR ANGLE »: the angle comes last, so what the six share
+// is one identical prefix.
 function reviewerPrompt(key, extra) {
-  return `${REVIEWERS[key].brief}
-
-You are one of six independent reviewers, each with a different angle, plus live testers who run the result in a browser. You do not see the others; do not try to agree with anyone. Find real problems from your angle and prove them — do not approve, do not summarise the work.
+  return `You are one of six independent reviewers of a spec's result, each with one angle — yours is at the end of this prompt — plus live testers who run the result in a browser. You do not see the others; do not try to agree with anyone. Find real problems from your angle and prove them — do not approve, do not summarise the work.
 
 ${SPEC_LINE}
 ${list(CRITERIA)}
 The result lives in ${W} (branch ${BR}). ${changes}${pubNote}
-${extra || ''}
 Tests: ${suiteCmd ? `never run the whole suite — a live tester runs \`${suiteCmd}\` once into ${SUITE_LOG}, complete when its last line is "EXIT <code>"; read it there if you need it (not growing for 15 minutes → go on without it).` : 'none given.'} You may run single tests, scripts and measurements of your own, from a fresh \`mktemp -d\` folder.
 Never use the browser tools: the live testers own the browser. Something only the browser can show → a "lead" written as a scenario they can try.
 Do not edit any tracked file under ${ROOT} or ${W}.
-${portRule(10 + REVIEWER_KEYS.indexOf(key))}
+${REPLAY_RULE}
 
 Findings:
 - "defect" only with a proof: the exact reproduction or measurement. A suspicion → "lead".
 - severity: "blocking" (a criterion does not hold, data loss, a security hole), "major" (real harm in normal use), "minor" (polish, rare edge case). Be honest: minor findings are reported, never repaired by this review.
+- a blocking or major defect: save its reproduction as a replay script (exit 0 once the defect is gone), its path in "replay" — the re-judgement runs it instead of redoing your work.
+- a minor finding: never a reproduction, a script or a measurement for it — its title and, as proof, the place (file and line, or the screen), one line. Not sure it is minor → check just enough to decide.
+- the same mistake in several places is one finding: the mistake named in its title, every place you saw in "where" — the developer then fixes them all in one round.
 - attach each to the criterion it breaks, or "${GENERAL}".
 - problems that existed before the spec → "outsideSpec".
 No problem found from your angle → empty findings: that is a valid answer.
 
-${COMMON_RULES}`
+${COMMON_RULES}
+
+YOUR ANGLE — ${REVIEWERS[key].label}
+${REVIEWERS[key].brief}
+Your replay scripts are named ${key}-<n>.sh. ${portRule(10 + REVIEWER_KEYS.indexOf(key))}${extra ? `\n${extra}` : ''}`
 }
 
 function testerPrompt(i, cs, extra) {
@@ -485,9 +505,10 @@ How:
 3. ${BROWSER_RULE(`spec-first-${key}`)}
 4. Not a web interface → exercise it the way its user does: the CLI, the API calls, the library imported in a fresh environment.
 ${runsSuite ? `5. Tests: you alone run the suite, once, in the background, at the start: \`${suiteCommand(inSub(W), SUITE_LOG, suiteCmd)}\` — the reviewers read its log. Read the result before you return: a test failing now is a defect of the criterion it covers (or "${GENERAL}").` : `5. Tests: never run the suite${suiteCmd ? ` — tester 1 runs it into ${SUITE_LOG}` : ''}.`}
+6. ${REPLAY_RULE} One per criterion you pass or prove broken, named c<criterion id>.sh, its path in that verdict's "replay" — written from the checks you just made, not a new exploration; eyes or a real pointer alone can judge it (a layout, a colour, a drag) → "replay" empty, and the proof says why.
 
 Verdict per criterion: "pass" = you exercised it live and it held (proof: the journey and what you saw); "defect" = you proved it fails (proof: the steps and the observed behaviour); "unverifiable" = a device or a credential is missing (proof names it).
-findings: everything else you met, with severity — console errors, failing requests, broken flows, slowness; a suspicion → "lead".
+findings: everything else you met, with severity — console errors, failing requests, broken flows, slowness; a suspicion → "lead". A blocking or major one → its replay script too, in "replay"; a minor one → its title and the place, one line, no reproduction; the same mistake in several places → one finding, every place in "where".
 Do not edit any tracked file. Scratch files in a fresh \`mktemp -d\` folder.
 ${portRule(20 + i)}${locksFor(cs.map(c => c.id)).length ? `
 You hold the exclusive resource(s) ${locksFor(cs.map(c => c.id)).map(r => `« ${r} »`).join(', ')} for this task.` : ''}
@@ -498,12 +519,13 @@ ${COMMON_RULES}`
 // findings: every distinct problem with its source; verdicts: the testers' per criterion.
 let findings = []
 const verdicts = {}
+const scriptOf = id => replayOf(verdicts[id] && verdicts[id].replay) // the replay script a live tester left for a criterion
 let silent = [] // reviewers that never answered, even after the retry: the review cannot pass without them
 const ciP = ciKick().catch(e => log(`CI : envoi impossible (${errText(e)})`))
 if (!FOCUS.length) {
   phase('Revue')
   const jobs = [
-    ...testerShares.map((cs, i) => () => ask(testerPrompt(i, cs), { ...REVIEWER, schema: testerSchema(cs.map(c => c.id)), phase: 'Revue', locks: locksFor(cs.map(c => c.id)), label: `Testeur ${i + 1} en conditions réelles (${REVIEWER.model} ${REVIEWER.effort})` })),
+    ...testerShares.map((cs, i) => () => ask(testerPrompt(i, cs), { ...REVIEWER, schema: testerSchema(cs.map(c => c.id), true), phase: 'Revue', locks: locksFor(cs.map(c => c.id)), label: `Testeur ${i + 1} en conditions réelles (${REVIEWER.model} ${REVIEWER.effort})` })),
     ...REVIEWER_KEYS.map(k => () => ask(reviewerPrompt(k), { ...REVIEWER, schema: REVIEW_SCHEMA, phase: 'Revue', label: `Relecteur ${REVIEWERS[k].label} (${REVIEWER.model} ${REVIEWER.effort})` })),
   ]
   const out = overBudget('la revue') ? [] : await parallel(jobs)
@@ -515,7 +537,7 @@ if (!FOCUS.length) {
     for (const c of cs) {
       const v = r && r.verdicts ? r.verdicts[c.id] : null
       verdicts[c.id] = v || null
-      if (v && v.verdict === 'defect') raw.push({ criterion: c.id, kind: 'defect', severity: 'blocking', title: `critère ${c.id} ne tient pas`, proof: v.proof, from: testerKey(i) })
+      if (v && v.verdict === 'defect') raw.push({ criterion: c.id, kind: 'defect', severity: 'blocking', title: `critère ${c.id} ne tient pas`, proof: v.proof, replay: v.replay, from: testerKey(i) })
     }
     for (const f of (r && r.findings) || []) raw.push({ ...f, from: testerKey(i) })
   })
@@ -531,7 +553,7 @@ if (!FOCUS.length) {
   // ================================================================= 2. merge duplicates, try the leads
   phase('Pistes')
   if (raw.length > 1 && !overBudget('la fusion des doublons')) {
-    const m = await ask(`You merge the findings of a review panel: six reviewers and the live testers reported independently, so the same problem may appear several times, in other words. Merge duplicates into one entry (keep the clearest proof, the highest severity, every source key in "from"); a defect and a lead about the same problem → one defect. Never drop, invent, re-judge or soften a finding; never change "defect" into "lead" or the reverse except when merging. Read the files only if two findings look alike and you cannot tell otherwise.
+    const m = await ask(`You merge the findings of a review panel: six reviewers and the live testers reported independently, so the same problem may appear several times, in other words. Merge duplicates into one entry (keep the clearest proof and its "replay" path, the highest severity, every source key in "from", every place in "where"); a defect and a lead about the same problem → one defect. Never drop, invent, re-judge or soften a finding; never change "defect" into "lead" or the reverse except when merging. Read the files only if two findings look alike and you cannot tell otherwise.
 
 <findings>
 ${raw.map(f => JSON.stringify(f)).join('\n')}
@@ -545,7 +567,7 @@ Answer with the merged list only.`, { ...MERGER, schema: MERGED_SCHEMA, phase: '
   findings = findings.map((f, i) => {
     const criterion = byId[f.criterion] ? f.criterion : GENERAL
     const from = [...new Set(f.from.map(keyOf).map(k => k === 'tester' ? (byId[criterion] ? testerOf[criterion] : testerKey(0)) : k).filter(Boolean))]
-    return { ...f, criterion, from: from.length ? from : [byId[criterion] ? testerOf[criterion] : 'integration'], n: i + 1 }
+    return { ...f, criterion, replay: replayOf(f.replay), from: from.length ? from : [byId[criterion] ? testerOf[criterion] : 'integration'], n: i + 1 }
   })
 
   // Leads that could matter: one live tester tries them all, once.
@@ -559,6 +581,7 @@ ${leads.map(f => `[${f.n}] (critère ${f.criterion}, ${f.severity}) ${f.title} �
 </leads>
 Start the result from ${inSub(W)} on your own ports (it lacks its dependencies → ${PREPARE}). ${HARNESS_RULE}
 ${BROWSER_RULE('spec-first-pistes')}
+${REPLAY_RULE} A lead you prove → its replay script, named lead-<n>.sh, in "replay".
 Do not edit any tracked file. ${portRule(30)}${RESOURCES.length ? `
 You hold the exclusive resource(s) ${RESOURCES.map(x => `« ${x} »`).join(', ')} for this task.` : ''}
 
@@ -566,7 +589,7 @@ ${COMMON_RULES}`, { ...REVIEWER, schema: LEADS_SCHEMA, phase: 'Pistes', locks: R
     for (const x of (r && r.results) || []) {
       const f = findings.find(y => y.n === Number(x.n) && y.kind === 'lead')
       if (!f) continue
-      if (x.outcome === 'proven') { f.kind = 'defect'; f.proof = `${f.proof}\n[prouvé par le testeur des pistes] ${x.proof}`; f.from.push('tester-leads') }
+      if (x.outcome === 'proven') { f.kind = 'defect'; f.proof = `${f.proof}\n[prouvé par le testeur des pistes] ${x.proof}`; f.from.push('tester-leads'); f.replay = replayOf(x.replay) || f.replay }
       else f.dismissed = `${x.outcome === 'dismissed' ? 'écartée' : 'invérifiable'} : ${x.proof}`
     }
     log(`Pistes : ${leads.filter(f => f.kind === 'defect').length}/${leads.length} prouvée(s) en conditions réelles`)
@@ -590,7 +613,11 @@ const touchedFiles = []
 
 // Re-judges: each source of the open findings, given only its own findings. In a targeted
 // re-review, round 0 is a re-judgement of the findings as they stand, before any repair.
-async function rejudge(open, round, summary) {
+// After a repair the other criteria are replayed too, cheaply: every replay script first; a criterion
+// without one is replayed live only where the repair reaches — all of them on the last round.
+async function rejudge(open, round, summary, files) {
+  const lastRound = round >= REPAIR_EFFORTS.length
+  const changed = (files || []).map(String).filter(p => /^[A-Za-z0-9._/@+ -]+$/.test(p)).slice(0, 30)
   const bySource = new Map()
   for (const f of open) {
     // A finding on a criterion is always replayed live by that criterion's tester, too.
@@ -602,22 +629,29 @@ async function rejudge(open, round, summary) {
       if (!bySource.get(k).includes(f)) bySource.get(k).push(f)
     }
   }
-  // After a repair, a tester already re-judging replays the main path of its other criteria: no extra agent.
+  // After a repair, a tester already re-judging replays its other criteria, and the first one those of
+  // a tester that is not re-judging: no extra agent.
   const sharing = round > 0 ? CRITERIA.filter(c => !open.some(f => f.criterion === c.id)) : []
   const ciAgain = bySource.has('ci')
   bySource.delete('ci')
   const firstTester = [...bySource.keys()].find(k => k.startsWith('tester'))
   const jobs = [...bySource].map(([k, fs]) => () => {
     const isTester = k.startsWith('tester')
-    const replay = isTester ? sharing.filter(c => testerOf[c.id] === k) : []
+    const replay = isTester ? sharing.filter(c => testerOf[c.id] === k || (k === firstTester && !bySource.has(testerOf[c.id]))) : []
     const prompt = `${isTester ? `You are a LIVE TESTER of this spec.` : REVIEWERS[k].brief}
 
-${round > 0 ? `A developer just repaired defects of this spec: ${summary}` : 'A development run reworked the criteria below since these findings were reported.'} You reported the findings below earlier. For each one, check whether it is fixed — run your reproduction again, exactly, on the real result — and nothing else.
+${round > 0 ? `A developer just repaired defects of this spec: ${summary}` : 'A development run reworked the criteria below since these findings were reported.'} You reported the findings below earlier. For each one, check whether it is fixed — run your reproduction again, exactly, on the real result — and nothing else. A finding with a replay script: run it first (\`<script> <url>\`); it fails → not fixed, look no further; it passes → check once${isTester ? ', live,' : ''} what the script cannot see, then "fixed".
 <your_findings>
-${fs.map(f => `[${f.n}] (critère ${f.criterion}) ${f.title} — ${f.proof}${f.devNote ? `\n  The developer disputes it: ${f.devNote} — read that in the spec yourself; if the spec settles it, the finding is fixed.` : ''}`).join('\n')}
+${fs.map(f => `[${f.n}] (critère ${f.criterion}) ${f.title} — ${f.proof}${f.replay ? `\n  replay: ${f.replay}` : ''}${isTester && scriptOf(f.criterion) && scriptOf(f.criterion) !== f.replay ? `\n  replay script of criterion ${f.criterion}, to run too: ${scriptOf(f.criterion)}` : ''}${f.devNote ? `\n  The developer disputes it: ${f.devNote} — read that in the spec yourself; if the spec settles it, the finding is fixed.` : ''}`).join('\n')}
 </your_findings>
 A check you cannot run at all (a device or a credential missing) → "unverifiable": true, never "fixed".
-${replay.length ? `Also replay the main path of these criteria live — quickly, the repair may have touched them — and report a regression in newDefects:\n${list(replay, 'replay')}\n` : ''}Spec: ${SPEC}. The result lives in ${W} (branch ${BR}). ${changes}
+${replay.length ? `Also check these criteria still hold after the repair, and report a regression in newDefects:
+<replay>
+${replay.map(c => `<criterion id="${c.id}"${scriptOf(c.id) ? ` script="${scriptOf(c.id)}"` : ''}>${c.text}</criterion>`).join('\n')}
+</replay>
+- with a script: run every script first, one command each against your instance, no browser. One fails → look live: a real regression → newDefects; the script itself was wrong → fix the script and say so.
+- without a script: ${lastRound ? 'replay its main path live — this is the last round, every one of them.' : `replay its main path live only if the repair can reach it — it changed ${changed.length ? changed.join(', ') : 'the files its summary names'} (\`git -C ${W} log --stat -3\`); in doubt, replay.`}
+` : ''}Spec: ${SPEC}. The result lives in ${W} (branch ${BR}). ${changes}
 ${isTester ? `Start the result from ${inSub(W)} on your own ports (it lacks its dependencies → ${PREPARE}). ${HARNESS_RULE}
 ${BROWSER_RULE(`spec-first-${k}-r${round}`)}` : 'Never use the browser tools.'}
 ${isTester && round > 0 && k === firstTester && testCommand ? `The repair is done: run the full suite once, in the background, \`${suiteCommand(inSub(W), suitePath(`apres-reparation-${round}`), testCommand)}\`, and read it before you return — a test failing now is in newDefects.\n` : ''}newDefects: only what the repair itself broke, proven. Do not edit any tracked file. ${portRule(40 + 10 * round + [...bySource.keys()].indexOf(k))}${isTester && RESOURCES.length ? `
@@ -640,7 +674,7 @@ ${COMMON_RULES}`
       f.votes = f.votes || {}
       f.votes[k] = { fixed: !!x.fixed && !x.unverifiable, unverifiable: !!x.unverifiable, proof: x.proof }
     }
-    for (const d of r.newDefects || []) fresh.push({ ...d, criterion: byId[d.criterion] ? d.criterion : GENERAL, from: [k], n: findings.length + fresh.length + 1, fromRepair: round })
+    for (const d of r.newDefects || []) fresh.push({ ...d, criterion: byId[d.criterion] ? d.criterion : GENERAL, replay: replayOf(d.replay), from: [k], n: findings.length + fresh.length + 1, fromRepair: round })
   })
   for (const f of open) {
     const vs = Object.values(f.votes || {})
@@ -682,12 +716,12 @@ try {
 ${SPEC_LINE}
 ${list(CRITERIA)}
 <defects>
-${batch.map(f => `[${f.n}] (critère ${f.criterion}, ${f.severity}, relevé par ${f.from.map(labelOf).join(', ')}) ${f.title}${f.where ? ` — in ${f.where}` : ''}\n${f.proof}`).join('\n\n')}
+${batch.map(f => `[${f.n}] (critère ${f.criterion}, ${f.severity}, relevé par ${f.from.map(labelOf).join(', ')}) ${f.title}${f.where ? ` — in ${f.where}` : ''}\n${f.proof}${f.replay ? `\nreplay: ${f.replay}` : ''}`).join('\n\n')}
 </defects>
 Work in ${W} (branch ${BR}) — every file you edit is under it, never under ${ROOT}. ${changes}
-Start from each defect's reproduction and place, no wider exploration. Reading: grep finds the place, a file is read once — never in successive slices, never twice. Keep ${ROOT}/.spec-first/logs/${SPEC_ID}-reparation-${round + 1}.md current (fixed, files changed, left to do): after a context compaction, read it and go on.
+Start from each defect's reproduction and place, no wider exploration. One exception: a defect names one instance of a mistake — grep the spec's changes for the same mistake elsewhere (the places it names first) and fix every instance in this round. Reading: grep finds the place, a file is read once — never in successive slices, never twice. Keep ${ROOT}/.spec-first/logs/${SPEC_ID}-reparation-${round + 1}.md current (fixed, files changed, left to do): after a context compaction, read it and go on.
 Before touching code, for each defect: a slip (fix the cause) or an approach that cannot hold (take another, never a second patch on it), or the environment (fix the configuration, no code).
-Re-run each reproduction and the tests of what you touched${quickTestCommand ? `, then \`${quickTestCommand}\` once` : ''}${SUBDIR ? ` from ${SUBDIR}` : ''} before returning; never the full suite. Then commit on ${BR}. Commit hooks always run, never --no-verify; one fails for a reason outside your changes → "blocker" starting with "TECHNIQUE:". A test that fails now and then: never skip it, never add a sleep, never rerun it until it passes. Find the cause; not found → leave the test as it is and say so in your summary.
+Re-run each reproduction (its replay script when it names one: \`<script> <url>\`; never edit a replay script — one you judge wrong → that defect's note) and the tests of what you touched${quickTestCommand ? `, then \`${quickTestCommand}\` once` : ''}${SUBDIR ? ` from ${SUBDIR}` : ''} before returning; never the full suite. Then commit on ${BR}. Commit hooks always run, never --no-verify; one fails for a reason outside your changes → "blocker" starting with "TECHNIQUE:". A test that fails now and then: never skip it, never add a sleep, never rerun it until it passes. Find the cause; not found → leave the test as it is and say so in your summary.
 Never run commands that rewrite files outside the defects (repo-wide formatters, lockfile upgrades). A defect you judge wrong → done false and, in note, the spec sentence it contradicts, quoted.
 ${portRule(60 + round)}${RESOURCES.length ? `
 You hold the exclusive resource(s) ${RESOURCES.map(x => `« ${x} »`).join(', ')} for this task.` : ''}
@@ -701,7 +735,7 @@ ${COMMON_RULES}`, { model: M, effort, schema: REPAIR_SCHEMA, phase: 'Réparation
     if (dev.blocker && !dev.changed) { repairBlocker = String(dev.blocker); break }
     // A defect the developer disputes with the spec's words: its reviewer reads them when re-judging.
     for (const x of dev.perDefect || []) { const f = batch.find(y => y.n === Number(x.n)); if (f && !x.done && String(x.note || '').trim()) f.devNote = String(x.note).trim() }
-    const fresh = await rejudge(batch, round + 1, dev.summary)
+    const fresh = await rejudge(batch, round + 1, dev.summary, dev.files)
     log(`Réparation essai ${round + 1} (${M} ${effort}) — ${batch.filter(f => f.fixed).length}/${batch.length} réglé(s)${fresh ? `, ${fresh} défaut(s) causé(s) par la réparation` : ''}`)
     if (dev.blocker) { repairBlocker = String(dev.blocker); break }
   }
@@ -858,7 +892,7 @@ const counts = { total: criteria.length, validated: 0, unverified: 0, failed: 0,
 for (const c of criteria) counts[c.status] = (counts[c.status] || 0) + 1
 const short = f => ({ n: f.n, criterion: f.criterion, severity: f.severity, title: f.title, by: f.from.map(labelOf), keys: f.from })
 // A ready focus for a finding: its sources as keys (the CI → the live testers, who replay it).
-const focusOf = f => [...new Set(f.from.map(s => s === 'ci' || s.startsWith('tester') ? 'tester' : s))].map(r => ({ ...(byId[f.criterion] ? { id: f.criterion } : {}), reviewer: r, finding: `${f.title} — ${f.proof}`.slice(0, 1500) }))
+const focusOf = f => [...new Set(f.from.map(s => s === 'ci' || s.startsWith('tester') ? 'tester' : s))].map(r => ({ ...(byId[f.criterion] ? { id: f.criterion } : {}), reviewer: r, finding: `${f.title} — ${f.proof}`.slice(0, 1500) + (f.replay ? ` [replay script: ${f.replay}]` : '') }))
 const waitingOut = externalWait ? {
   kind: externalWait.kind, what: externalWait.what, where: externalWait.where, check: externalWait.check,
   limitMinutes: CI_WAIT_MIN, waitRound: WAIT_ROUND + 1,
@@ -899,6 +933,8 @@ return {
   repaired: findings.filter(f => f.fixed).map(short),
   minor: findings.filter(f => f.kind === 'defect' && f.severity === 'minor').map(short),
   leadsDismissed: findings.filter(f => f.dismissed).length,
+  // Criteria a live tester left a replay script for, out of counts.total.
+  replayScripts: CRITERIA.filter(c => scriptOf(c.id)).length,
   repairRounds,
   repairBlocker,
   relaunch,

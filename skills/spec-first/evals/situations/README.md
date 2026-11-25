@@ -16,6 +16,8 @@ Modifié le 07/11/2026 (1.9.0, D15) : les grilles et les consignes parlent de la
 
 Modifié le 24/11/2026 (1.11.0, D18) : situations 29 (réglage en cours de run, file des fusions) et 30 (batterie rapide en parallèle).
 
+Modifié le 25/11/2026 (1.12.0, D19) : situation 31 (la revue jouée à la main après une réparation : scripts de rejeu d'abord, rejeu réel limité, mineurs en une ligne).
+
 Modifié le 23/11/2026 (décision d'Arthur) : trois passages par situation, notés à la majorité ; points acquis et barrière de sortie ; registre des rejets.
 
 ## Relancer le banc
