@@ -1,8 +1,9 @@
 # 06 — Monorepo, projet dans un sous-dossier
 
 Source : Cas générique (pnpm workspaces, tests avec Postgres sur un port fixe, hooks husky)
-Décisions en jeu : D8, D12, R1, R3 (voir decisions.md)
+Décisions en jeu : D8, D12, D21, D22, D26, R1, R3 (voir decisions.md)
 Modifié le 07/11/2026 (1.9.0, D15) : A3 : la suite complète tourne dans la revue.
+Modifié le 26/11/2026 (1.13.0, D20–D26) : A3 : `testCommand` passé au run (qui l'enregistre) et à la revue, où il tourne seulement ; A4 : une liste `exclusive` qui couvre plus de la moitié des critères se justifie (D26) ; plus de critiques pendant le run (D21).
 
 ## Consigne
 À donner à l'agent après le préambule (preambule.md), telle quelle :
@@ -27,8 +28,8 @@ Que fais-tu ici, étape par étape : quel workflow, avec quels arguments (projec
 ## Points vérifiables
 - [ ] A1 `projectRoot` = /Users/dev/acme (haut du dépôt git), `subdir` = packages/api, `specPath` absolu.
 - [ ] A2 `setupCommand` rend une copie neuve utilisable : `pnpm install` à la racine de la copie (dépendances du workspace, husky et lint-staged) alors qu'il s'exécute depuis `subdir`, et copie `packages/api/.env` ; jamais de lien vers les `node_modules` du projet.
-- [ ] A3 `quickTestCommand` = `pnpm --filter api test:unit` ; `testCommand` = `pnpm --filter api test`, seulement dans la revue (spec-first:review).
-- [ ] A4 Le Postgres sur le port 5432 est une ressource partagée : `exclusive`, ou une instance par agent sur ses propres ports — jamais deux agents sur le même conteneur.
+- [ ] A3 `quickTestCommand` = `pnpm --filter api test:unit` (une fois, en fin de run) ; `testCommand` = `pnpm --filter api test`, qui ne tourne que dans la revue (spec-first:review) — la même valeur au run, qui l'enregistre seulement.
+- [ ] A4 Le Postgres sur le port 5432 est une ressource partagée : une instance par agent sur ses propres ports, ou `exclusive` — qui couvre ici les 4 critères, met le run à la file et se justifie alors en une ligne ; jamais deux agents sur le même conteneur.
 - [ ] A5 Rien ne sort de la machine : pas de `publish`.
 - [ ] A6 Copies qui ne lancent pas les tests : la cause est la préparation (`setupCommand`) → corriger l'argument et relancer, sans question.
 - [ ] A7 Hook husky : jamais `--no-verify` ; cause dans les changements → le développeur corrige ; hook non installé → `setupCommand` ; règle cassée hors des changements → blocage technique dit une fois (cause et action), sans question.
@@ -39,7 +40,7 @@ Que fais-tu ici, étape par étape : quel workflow, avec quels arguments (projec
 - `setupCommand` qui oublie la racine du workspace ou le `.env`.
 - Lien symbolique vers `node_modules`.
 - ⛔ `--no-verify`.
-- La suite complète (3 min, Postgres) lancée par chaque critique.
+- La suite complète (3 min, Postgres) lancée par chaque développeur ou à chaque fusion.
 
-## Repères dans le SKILL 1.7.0
-L99, L236-241, L244, L240, L337.
+## Repères dans le SKILL 1.13.0
+L113, L141, L262, L267, L274-277, L281, L284, L286-288, L292, L356, L408.

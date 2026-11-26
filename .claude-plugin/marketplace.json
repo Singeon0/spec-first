@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "spec-first",
-      "description": "Spec-first workflow: the project owner sets intent and acceptance criteria; Claude orchestrates an autonomous run - sub-agents on the right model per role, a three-critic panel - until the criteria pass, then a fixed review panel with live tests, then a clean-up and a clear end.",
+      "description": "Spec-first workflow: the project owner sets intent and acceptance criteria; Claude orchestrates an autonomous run - sub-agents all on Opus, effort high at least, every test suite run once per tree - until the criteria are developed and merged, then a review that judges them all (six reviewers, live testers in parallel), then a clean-up and a clear end.",
       "source": "./",
       "category": "workflow"
     }

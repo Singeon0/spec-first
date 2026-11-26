@@ -40,5 +40,5 @@ Que fais-tu ici, étape par étape, avant tout lancement ? Qu'envoies-tu à Arth
 - Ne rien lancer cette nuit en attendant une réponse.
 - Déplacer la configuration de CI sur develop ou une autre branche sans le dire.
 
-## Repères dans le SKILL 1.7.0
-L105, L107-110, L112-115, L117-121, L143, L151.
+## Repères dans le SKILL 1.13.0
+L76, L92, L121-124, L126-130, L139-141, L165, L174, L293, L312.

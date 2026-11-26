@@ -1,7 +1,8 @@
 # 27 — Environnement partagé entre les copies
 
 Source : Inspirée d'un projet Python dont l'environnement virtuel commun, installé en mode éditable, faisait tester aux critiques le code du projet au lieu de celui de leur copie
-Décisions en jeu : D5, D8, R1, R8 (voir decisions.md)
+Décisions en jeu : D5, D8, D20, D21, R1, R8 (voir decisions.md)
+Modifié le 26/11/2026 (1.13.0, D20–D26) : la consigne ne nomme plus de profil (D20) ; plus de critiques pendant le run dans les erreurs typiques (D21) ; points inchangés.
 
 ## Consigne
 À donner à l'agent après le préambule (preambule.md), telle quelle :
@@ -9,7 +10,7 @@ Décisions en jeu : D5, D8, R1, R8 (voir decisions.md)
 ```text
 SITUATION
 Projet seglab-hsi, dépôt /home/alo/GitHub/seglab-hsi (git, propre). Le CLAUDE.md du dépôt dit : « Environnement : source ~/.venvs/seglab/bin/activate (le paquet y est installé en mode éditable : pip install -e . depuis ce dossier). Extension C : make ext (compile dans /home/alo/build/seglab-ext, chemin fixe). Tests : pytest (3 min), tests rapides : pytest -m "not slow" (30 s). »
-Spec specs/filtres-spectraux.md, 5 critères indépendants ; les critères 2 et 4 modifient l'extension C. Profil standard. Arthur écrit : « Go. »
+Spec specs/filtres-spectraux.md, 5 critères indépendants ; les critères 2 et 4 modifient l'extension C. Arthur écrit : « Go. »
 
 QUESTION
 Que fais-tu ici, étape par étape : quel workflow, avec quels arguments (setupCommand, exclusive, maxGroups, tests), et pourquoi ? Que se passerait-il si les copies utilisaient toutes l'environnement ~/.venvs/seglab ?
@@ -27,10 +28,10 @@ Que fais-tu ici, étape par étape : quel workflow, avec quels arguments (setupC
 - [ ] A6 `quickTestCommand` = les tests rapides, `testCommand` = la suite complète ; aucune question à Arthur (c'est le comment).
 
 ## Erreurs typiques
-- Copies qui partagent ~/.venvs/seglab : les critiques valident le code du projet, pas celui du développeur.
+- Copies qui partagent ~/.venvs/seglab : les développeurs (et le testeur du socle) vérifient le code du projet, pas celui de leur copie.
 - `maxGroups: 1` « pour être tranquille ».
 - Deux compilations de l'extension en même temps dans /home/alo/build/seglab-ext.
 - Demander à Arthur comment gérer l'environnement.
 
-## Repères dans le SKILL 1.8.0
-L256, L260, L258.
+## Repères dans le SKILL 1.13.0
+L86, L275, L277, L284, L286, L289, L292.

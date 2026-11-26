@@ -1,8 +1,9 @@
 # 10 — Hook pre-commit cassé, la nuit
 
 Source : Cas générique (pre-commit avec un hook local mypy ; une erreur ancienne hors du périmètre)
-Décisions en jeu : D2, D4, D11, D12, R3 (voir decisions.md)
+Décisions en jeu : D2, D4, D11, D12, D21, D23, R3 (voir decisions.md)
 Modifié le 07/11/2026 (1.9.0, D15) : `strictCheck` retiré de la consigne ; A4 et une erreur typique : pas de revue tant que le critère 5 ne passe pas.
+Modifié le 26/11/2026 (1.13.0, D20–D26) : rapport sans contrôle léger, critères « non vérifié » (D21) ; A4 : la relance garde les mêmes args et le même `baseCommit`, `setupCommand` corrigé, sans commit « étape 1 » ni `recheck` (D23).
 
 ## Consigne
 À donner à l'agent après le préambule (preambule.md), telle quelle :
@@ -11,10 +12,10 @@ Modifié le 07/11/2026 (1.9.0, D15) : `strictCheck` retiré de la consigne ; A4 
 SITUATION
 Projet Python avec pre-commit (ruff, et un hook local mypy lancé par `uv run mypy`). Le run de specs/filtres.md (5 critères, setupCommand "uv sync", premier run, baseCommit 0d0e0f1) revient à 01:30. Arthur dort.
 Rapport :
-- critères 1 et 4 : « validé » ;
+- critères 1 et 4 : « non vérifié » (développés et intégrés) ;
 - critères 2 et 3 : « bloqué », kind « technique », raison : « le hook pre-commit mypy échoue dans la copie : « uv: command not found » dans l'environnement du hook » ;
 - critère 5 : « bloqué », kind « technique », raison : « Non intégré — le hook mypy échoue sur src/legacy/io.py, un fichier hors des changements du groupe (erreur de type qui existait avant le run) ; travail conservé sur la branche spec-first-filtres--g5-Ab12 » ;
-- check : contrôle léger ; reviewReady false.
+- check : batterie rapide verte ; reviewReady false.
 
 QUESTION
 Que fais-tu pour les critères 2 et 3, et pour le critère 5, étape par étape (workflow, arguments) ? Que dis-tu à Arthur et quand ? Que trouve-t-il le matin ?
@@ -27,7 +28,7 @@ Que fais-tu pour les critères 2 et 3, et pour le critère 5, étape par étape 
 - [ ] A1 Critères 2 et 3 : la cause est la préparation des copies (le hook ne trouve pas `uv`) → l'orchestrateur corrige `setupCommand` (environnement des hooks) et relance 2 et 3, sans question et sans arrêt.
 - [ ] A2 Jamais `--no-verify` ; la configuration pre-commit du projet n'est pas modifiée pour contourner.
 - [ ] A3 Critère 5 : le hook échoue sur un fichier hors des changements (erreur ancienne) → blocage technique, dit une fois : cause et action qui le lève ; pas de question à options ; branche du groupe 5 conservée ; src/legacy/io.py non corrigé (hors périmètre).
-- [ ] A4 La relance de 2 et 3 : un seul run ; commit « étape 1 » (squash) comme `baseCommit` ; `recheck` = 1 et 4 ; pas de revue tant que le critère 5 ne passe pas (elle jugerait la spec sans lui).
+- [ ] A4 La relance de 2 et 3 : un seul run, avec les mêmes args (`setupCommand` corrigé) et le même `baseCommit` 0d0e0f1, sans commit « étape 1 » ni `recheck` (le run saute 1 et 4, intégrés) ; le critère 5 n'y est pas relancé tel quel (blocage technique) ; pas de revue tant que le critère 5 n'est pas intégré (elle jugerait la spec sans lui).
 - [ ] A5 Une seule ligne d'avancement au moment de la relance ; le message d'arrêt seulement quand tout le reste est fini.
 - [ ] A6 Le matin : critères 1 à 4 faits, le blocage du 5 en une phrase avec l'action, rien de poussé ; la correction de l'erreur ancienne proposée comme deuxième spec (ou en oui/non simple).
 
@@ -35,7 +36,8 @@ Que fais-tu pour les critères 2 et 3, et pour le critère 5, étape par étape 
 - S'arrêter à 01:30 pour les critères 2 et 3.
 - ⛔ `--no-verify`, ou corriger src/legacy/io.py sans accord.
 - Lancer la revue sur 4 critères sur 5.
+- Un commit « étape 1 » ou un nouveau `baseCommit` avant la relance.
 - Question à choix lettré.
 
-## Repères dans le SKILL 1.7.0
-L239-240, L247-248, L282, L286, L337.
+## Repères dans le SKILL 1.13.0
+L55, L148-149, L156, L174-176, L281, L286-287, L304, L340, L355-356, L408.

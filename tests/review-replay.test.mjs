@@ -4,7 +4,8 @@
 // - every live verdict and every blocking or major defect leaves a replay script, and a path an agent
 //   returned outside the replay folder never reaches a prompt;
 // - after a repair: the scripts first, the browser only where the repair reaches, everything live on the
-//   last round; criteria of a tester that is not re-judging go to the first one;
+//   last round; a slice no tester re-judges replays its scripts in one helper — never handed to another
+//   tester (refonte 26/11/2026);
 // - a minor finding gets no reproduction; a mistake made in several places is one finding, fixed everywhere;
 // - the six reviewers share one identical prefix, their angle comes last.
 // Run: node --test tests/*.test.mjs
@@ -45,10 +46,14 @@ const ARGS = {
 }
 const HOSTILE = '/etc/passwd; rm -rf x'
 
-// Tester 1 holds criteria 1 and 3, tester 2 holds 2 and 4. The reliability reviewer proves one major
-// defect on criterion 1; the usage reviewer reports one minor finding. The defect is fixed on round 3.
+// Contiguous slices: tester 1 holds criteria 1 and 2, tester 2 holds 3 and 4. The reliability reviewer proves
+// one major defect on criterion 1; the usage reviewer reports one minor finding. The defect is fixed on round 3.
+// The suite is green every time; the helper finds tester 2's slice clear after each repair.
 function answer(prompt, o) {
   const l = o.label
+  if (l.startsWith('Préparation')) return ({ suiteReady: true, recorded: Object.fromEntries(o.schema.properties.recorded.required.map(n => [n, true])), launch: 'data', launchNote: '', reason: '' })
+  if (/suite complète/i.test(l)) return { verdict: 'pass', key: 'full-abc', failures: [], note: '' }
+  if (/rejeux des tranches/.test(l)) return { slices: Object.fromEntries(Object.keys(o.schema.properties.slices.properties).map(n => [n, { clear: true, failing: [], why: '' }])) }
   if (l.startsWith('Testeur ')) {
     const ids = Object.keys(o.schema.properties.verdicts.properties)
     const replay = id => id === '3' ? '' : id === '4' ? HOSTILE : REPLAY + '/c' + id + '.sh'
@@ -64,7 +69,7 @@ function answer(prompt, o) {
   if (l.startsWith('Réparation essai')) return { changed: true, files: ['src/store.py', 'src/api/cubes.py'], summary: 'cascade delete', perDefect: [{ n: 1, done: true, note: '' }], decisions: [], blocker: '' }
   if (l.startsWith('Après réparation')) {
     const fixed = l.startsWith('Après réparation 3')
-    const ns = [...prompt.split('<your_findings>')[1].split('</your_findings>')[0].matchAll(/\[(\d+)\] \(critère/g)].map(m => Number(m[1]))
+    const ns = [...(prompt.split('<your_findings>')[1] || '').split('</your_findings>')[0].matchAll(/\[(\d+)\] \(critère/g)].map(m => Number(m[1]))
     return { results: ns.map(n => ({ n, fixed, unverifiable: false, proof: fixed ? 'script exits 0' : 'still 3 rows' })), newDefects: [] }
   }
   return null
@@ -100,7 +105,7 @@ test('a minor finding gets no reproduction and is never repaired', () => {
   for (const c of by(/^Testeur /)) assert.match(c.prompt, /a minor one → its title and the place, one line, no reproduction/)
   assert.equal(r.minor.length, 1)
   for (const c of by(/^Réparation essai/)) assert.ok(!c.prompt.includes('libellé tronqué'), 'a minor finding reached the repair')
-  for (const c of by(/^Après réparation/)) assert.ok(!c.prompt.split('<your_findings>')[1].split('</your_findings>')[0].includes('libellé tronqué'), 'a minor finding was re-judged')
+  for (const c of by(/^Après réparation/)) assert.ok(!(c.prompt.split('<your_findings>')[1] || '').split('</your_findings>')[0].includes('libellé tronqué'), 'a minor finding was re-judged')
   assert.equal(by(/^Après réparation \d — usage/).length, 0)
 })
 
@@ -130,9 +135,11 @@ test('a replay path outside the replay folder never reaches a prompt', () => {
 })
 
 test('after a repair: only the sources of the defect re-judge, script first', () => {
+  // Tester 2's slice holds no open finding: its scripts go to the helper on rounds 1 and 2; on the last
+  // round its criteria without a script bring it back, live.
   for (const n of [1, 2, 3]) {
-    const labels = by(new RegExp('^Après réparation ' + n)).map(c => c.label.split(' — ')[1].replace(/ \(.*/, '')).sort()
-    assert.deepEqual(labels, ['fiabilité', 'testeur 1'], 'round ' + n)
+    const labels = by(new RegExp('^Après réparation ' + n)).map(c => c.label.split(' — ')[1].replace(/ \(.*/, '')).filter(l => !/^(suite complète|rejeux)/.test(l)).sort()
+    assert.deepEqual(labels, n < 3 ? ['fiabilité', 'testeur 1'] : ['fiabilité', 'testeur 1', 'testeur 2'], 'round ' + n)
   }
   const rev = one(/^Après réparation 1 — fiabilité/)
   assert.ok(rev.prompt.includes('replay: ' + REPLAY + '/reliability-1.sh'))
@@ -145,12 +152,19 @@ test('after a repair: only the sources of the defect re-judge, script first', ()
 test('after a repair: the scripts first, live only where the repair reaches, everything live on the last round', () => {
   const t1 = one(/^Après réparation 1 — testeur 1/)
   const block = t1.prompt.split('<replay>')[1].split('</replay>')[0]
-  // Criterion 2 belongs to tester 2, who is not re-judging: the first tester replays it.
+  // Criterion 2 is in tester 1's slice; 3 and 4 are tester 2's, never handed to tester 1.
   assert.ok(block.includes('<criterion id="2" script="' + REPLAY + '/c2.sh">'), block)
-  assert.ok(block.includes('<criterion id="3">'), 'criterion 3 has no script')
-  assert.ok(block.includes('<criterion id="4">'), 'the refused path leaves criterion 4 without a script')
+  assert.ok(!block.includes('<criterion id="3"') && !block.includes('<criterion id="4"'), 'another slice was handed to tester 1')
   assert.ok(!block.includes('<criterion id="1"'), 'the criterion of the open defect is re-judged, not replayed')
-  assert.match(t1.prompt, /run every script first, one command each against your instance, no browser/)
+  assert.match(t1.prompt, /run them together first, against your instance, no browser, giving this command a 300-second timeout in your shell tool: `d=\$\(mktemp -d\) && printf/)
+  // Tester 2's slice: criterion 3 has no script, the path given for 4 was refused — the helper has no
+  // script to run on rounds 1 and 2, only the reach of the repair to judge; none on the last round.
+  for (const n of [1, 2]) assert.match(one(new RegExp('^Après réparation ' + n + ' — rejeux des tranches 2 ')).prompt, /No script to run: no instance needed/)
+  assert.equal(by(/^Après réparation 3 — rejeux/).length, 0)
+  const t2 = one(/^Après réparation 3 — testeur 2/)
+  const block2 = t2.prompt.split('<replay>')[1].split('</replay>')[0]
+  assert.ok(block2.includes('<criterion id="3">') && block2.includes('<criterion id="4">'), block2)
+  assert.match(t2.prompt, /this is the last round, every one of them/)
   assert.match(t1.prompt, /replay its main path live only if the repair can reach it — it changed src\/store\.py, src\/api\/cubes\.py/)
   assert.ok(!t1.prompt.includes('this is the last round'))
   assert.ok(!one(/^Après réparation 2 — testeur 1/).prompt.includes('this is the last round'))

@@ -40,7 +40,7 @@ g.args = args
 g.log = () => {}
 g.phase = () => {}
 g.agent = async (prompt, o = {}) => {
-  calls.push({ label: o.label || '', phase: o.phase || '', model: o.model || '', chars: prompt.length, schema: JSON.stringify(o.schema || {}).length, ...(flag === '--prompts' && { prompt, schemaText: JSON.stringify(o.schema || {}) }) })
+  calls.push({ label: o.label || '', phase: o.phase || '', model: o.model || '', effort: o.effort || '', chars: prompt.length, schema: JSON.stringify(o.schema || {}).length, ...(flag === '--prompts' && { prompt, schemaText: JSON.stringify(o.schema || {}) }) })
   rejecting = REJECT && !/essai [2-9]|relance|apr[eè]s r[eé]paration/i.test(o.label || '')
   return fake(o.schema)
 }

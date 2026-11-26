@@ -14,7 +14,8 @@ async function runReview(args, answer) {
   g.args = args
   g.log = () => {}
   g.phase = () => {}
-  g.agent = async (prompt, o) => { labels.push(o.label); return answer(prompt, o) }
+  // The first agent prepares the suite script: present here.
+  g.agent = async (prompt, o) => { labels.push(o.label); return o.label.startsWith('Préparation') ? ({ suiteReady: true, recorded: Object.fromEntries(o.schema.properties.recorded.required.map(n => [n, true])), launch: 'data', launchNote: '', reason: '' }) : answer(prompt, o) }
   // As the runtime does: the results come back as copies.
   g.parallel = async jobs => JSON.parse(JSON.stringify(await Promise.all(jobs.map(j => j()))))
   const r = await new Function(`return (async () => {\n${SRC}\n})()`)()
@@ -45,7 +46,7 @@ test('a defect every judge says is fixed counts as repaired, and no repair runs'
   assert.equal(r.open.length, 0, `still open: ${JSON.stringify(r.open)}`)
   assert.equal(r.repaired.length, 2)
   assert.equal(r.repairRounds, 0)
-  assert.ok(!labels.some(l => /réparation/i.test(l)), `a repair ran: ${labels.join(' | ')}`)
+  assert.ok(!labels.some(l => /^(Réparation|Après réparation)/.test(l)), `a repair ran: ${labels.join(' | ')}`)
 })
 
 test('a judge that says « not fixed » keeps the defect open', async () => {

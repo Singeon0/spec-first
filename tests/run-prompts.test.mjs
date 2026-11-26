@@ -52,19 +52,19 @@ test('every prompt gives the one allowed wait form and no vague one', () => {
   })
 })
 
-test('developers run the quick test command once, before the commit', () => {
+// Redesign of 26/11/2026 (3.3): the quick suite runs once, at the end of the run — never by a developer.
+test('developers run only the tests of what they touch, never the quick suite', () => {
   for (const v of ['run, happy path', 'run, every verdict fails once']) {
     const devs = variants[v].filter(c => c.phase === 'Développement')
     assert.ok(devs.length > 0, v)
     for (const c of devs) {
-      assert.ok(c.prompt.includes(`\`${RUN.quickTestCommand}\` once, just before your commit — never in a loop`), `${v} — ${c.label}`)
+      assert.ok(!c.prompt.includes(`\`${RUN.quickTestCommand}\``), `${v} — ${c.label}`)
       assert.match(c.prompt, /run only the tests of what you touch/, c.label)
     }
   }
   for (const c of variants['run, no quickTestCommand, subdir'].filter(c => c.phase === 'Développement')) {
     assert.match(c.prompt, /run only the tests of what you touch/, c.label)
     assert.ok(c.prompt.includes("from the copy's api folder"), c.label)
-    assert.doesNotMatch(c.prompt, /once, just before your commit/, c.label)
   }
 })
 
@@ -133,16 +133,20 @@ test('developers read a file once and keep notes for after a compaction; a findi
 })
 
 // Speed (24/11/2026, QualiSpectra on seglab-hsi-dev): fusions one by one made a 30-minute queue while
-// developer slots sat idle. The groups done while a fusion runs go together in the next one, tested
-// once; the groups others wait for go first, and one at least two groups wait for starts at high.
-test('waiting groups are merged together and tested once; a group others wait for starts at high', () => {
+// developer slots sat idle; 162 of their 200 minutes of commands were tests. Since the redesign of
+// 26/11/2026 a fusion runs only the tests of the files changed on both sides — never the quick suite —
+// and every developer starts at high. The batch itself is played in run-redesign.test.mjs, where the
+// agents' timing is controlled.
+test('fusions never run the quick suite; every developer starts at high', () => {
   const calls = variants['run, happy path']
-  const batch = calls.find(c => /^Fusion groupes /.test(c.label))
-  assert.ok(batch, 'a batch fusion')
-  assert.ok(batch.prompt.includes(`\`${RUN.quickTestCommand}\` once for the whole batch — never once per group`), batch.label)
-  assert.ok(JSON.parse(batch.schemaText).properties.notIntegrated, 'notIntegrated in the fusion schema')
+  const fusions = calls.filter(c => /^Fusion groupes? /.test(c.label))
+  assert.ok(fusions.length > 0, 'a fusion')
+  for (const f of fusions) {
+    assert.ok(!f.prompt.includes(`\`${RUN.quickTestCommand}\``), f.label)
+    assert.ok(JSON.parse(f.schemaText).properties.notIntegrated, 'notIntegrated in the fusion schema')
+  }
   assert.match(calls.find(c => c.label.startsWith('Groupe 1 — dév essai 1')).label, /\(opus high\)/)
-  assert.match(calls.find(c => c.label.startsWith('Groupe 4 — dév essai 1')).label, /\(opus medium\)/)
+  assert.match(calls.find(c => c.label.startsWith('Groupe 4 — dév essai 1')).label, /\(opus high\)/)
 })
 
 // Verification rules (24/11/2026): a change must not weaken the tests that judge it, a flaky test is
@@ -151,11 +155,13 @@ test('tests are protected: weakened tests are a defect, a flaky test is never wo
   const WEAK = 'a test deleted, skipped or loosened (an assertion removed or widened) when no criterion asks for it'
   const FLAKY = 'never skip it, never add a sleep, never rerun it until it passes'
   const run = variants['run, every verdict fails once'], review = variants['review, every verdict fails once']
-  const maintainers = run.filter(c => c.prompt.includes('You are the MAINTAINER'))
-  assert.ok(maintainers.length > 0)
-  for (const c of maintainers) assert.ok(c.prompt.includes(WEAK), c.label)
+  // No maintainer critic in the run since 26/11/2026: whoever writes code there carries the rule.
+  const writers = run.filter(c => c.phase === 'Développement' || c.label.startsWith('Réparation (batterie rapide)') || c.label.startsWith('Fusion groupe'))
+  assert.ok(writers.some(c => c.phase === 'Fusion'), 'the fusion fixes what the merges broke: it writes code too')
+  assert.ok(writers.length > 0)
+  for (const c of writers) assert.ok(c.prompt.includes(WEAK), c.label)
   assert.ok(review.find(c => c.prompt.includes('INTEGRATION AND MAINTENANCE REVIEWER')).prompt.includes(WEAK))
-  const devs = [...run.filter(c => c.phase === 'Développement'), ...run.filter(c => c.prompt.includes('repairing the light check')), ...review.filter(c => c.label.startsWith('Réparation essai'))]
+  const devs = [...run.filter(c => c.phase === 'Développement'), ...run.filter(c => c.prompt.includes('repairing the quick suite')), ...run.filter(c => c.label.startsWith('Fusion groupe')), ...review.filter(c => c.label.startsWith('Réparation essai'))]
   assert.ok(devs.length >= 3)
   for (const c of devs) assert.ok(c.prompt.includes(FLAKY), c.label)
   const testers = run.filter(c => c.prompt.includes('You are the TESTER'))

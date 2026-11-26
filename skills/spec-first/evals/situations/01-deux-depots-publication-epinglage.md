@@ -54,5 +54,5 @@ Que fais-tu ici, étape par étape : ce que tu vérifies avant de lancer, quel(s
 - Relancer le job en panne en boucle, ou demander « A : je réessaie, B : … ».
 - Copies ou scripts faits à la main hors de `spec-first:run`.
 
-## Repères dans le SKILL 1.7.0
-L31-37, L98-120, L143, L148, L153, L245, L266-269, L279, L286.
+## Repères dans le SKILL 1.13.0
+L31-39, L121-124, L126-130, L139-141, L161-162, L165, L171, L176, L281, L293, L312-313, L331-334, L356, L76.

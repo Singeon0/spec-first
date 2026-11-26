@@ -1,12 +1,12 @@
 {
   "version": "1.10.0",
-  "note": "measured by tests/measure.mjs on the fixtures, spec-first 1.10.0 — raised from 1.9.3 (run 342424, review 84372) for the token-cost rules: read-once, notes file, launch recipe, batched browser checks; raised again (run 344445, review 85196) for the verification rules: tests deleted, skipped or loosened are a defect, no workaround on a flaky test, generated inputs for a criterion stated as a property; review raised in 1.12.0 (85297 → 94641) for the review speed rules: replay scripts, minor findings without reproduction, a mistake fixed everywhere in one round, the reviewer's angle last",
+  "note": "measured by tests/measure.mjs on the fixtures, spec-first 1.10.0 — raised from 1.9.3 (run 342424, review 84372) for the token-cost rules: read-once, notes file, launch recipe, batched browser checks; raised again (run 344445, review 85196) for the verification rules: tests deleted, skipped or loosened are a defect, no workaround on a flaky test, generated inputs for a criterion stated as a property; review raised in 1.12.0 (85297 → 94641) for the review speed rules: replay scripts, minor findings without reproduction, a mistake fixed everywhere in one round, the reviewer's angle last; review raised in the refonte of 26/11/2026 (8 → 10 agents, 94641 → 109760) for the suite script — a preparation agent that records the commands, a suite agent of its own, the suite rule in every prompt — and the review rules of 3.5: replay scripts under 120 s run together, each tester its own instance, a refused trace tried again; then (109760 → 114769) for the fixes of the independent review: the launch recipe written once by the preparation with a data folder per agent, the suite's own remedies for a refused or lost run, the process-group kill of the replay batch",
   "run": {
     "agents": 45,
     "promptChars": 348646
   },
   "review": {
-    "agents": 8,
-    "promptChars": 94641
+    "agents": 10,
+    "promptChars": 114769
   }
 }

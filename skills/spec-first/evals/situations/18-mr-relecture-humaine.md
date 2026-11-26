@@ -38,5 +38,5 @@ Que fais-tu ici, étape par étape : comment tu surveilles, quand et comment tu 
 - `waitRound` oublié.
 - ⛔ Approuver via l'API ou changer les règles d'approbation.
 
-## Repères dans le SKILL 1.7.0
-L113, L136-144, L148, L254, L279.
+## Repères dans le SKILL 1.13.0
+L76, L130, L139-141, L161, L165, L171, L313, L349, L405.

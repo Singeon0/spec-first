@@ -5,7 +5,7 @@ Ce banc vérifie, à chaque version du plugin, qu'un orchestrateur qui lit SKILL
 ## Contenu
 - `decisions.md` : la référence. Les grilles notent les réponses par rapport aux décisions d'Arthur, pas par rapport au texte du SKILL.
 - `preambule.md` : le début de consigne, commun à toutes les situations.
-- `NN-*.md` : une situation par fichier — la consigne, le contexte fourni, les points vérifiables (A1, A2…), les erreurs typiques et, pour la 1.7.0, les lignes du SKILL concernées.
+- `NN-*.md` : une situation par fichier — la consigne, le contexte fourni, les points vérifiables (A1, A2…), les erreurs typiques et les lignes du SKILL concernées (« Repères », sur le SKILL 1.13.0 depuis le 26/11/2026). Ajoutées le 26/11/2026 : 32 (demande de go sur un graphe profond : plan du run, contrats dans le socle), 33 (la commande des suites : absente, copie refusée, suite perdue), 34 (« pourquoi c'était si long ? » et « accélère » : réponse depuis le bilan de temps).
 - `resultats-1.7.0.md` : les notes de la 1.7.0, point de départ des comparaisons.
 - `resultats-1.8.0.md` : les notes de la 1.8.0 (27 situations ; la 28 date de la 1.10.0).
 - `resultats-1.9.0.md` : les notes de la 1.9.0, avant et après corrections.
@@ -17,6 +17,8 @@ Modifié le 07/11/2026 (1.9.0, D15) : les grilles et les consignes parlent de la
 Modifié le 24/11/2026 (1.11.0, D18) : situations 29 (réglage en cours de run, file des fusions) et 30 (batterie rapide en parallèle).
 
 Modifié le 25/11/2026 (1.12.0, D19) : situation 31 (la revue jouée à la main après une réparation : scripts de rejeu d'abord, rejeu réel limité, mineurs en une ligne).
+
+Modifié le 26/11/2026 (1.13.0, D20–D26) : situations 01 à 31 réalignées sur un seul profil Opus high au minimum, le run sans critiques ni contrôle léger (testeur du socle, batterie rapide en fin de run, critères « non vérifié » jusqu'à la revue), la commande des suites, la reprise lue dans git, les testeurs de la revue en parallèle, le plan du run et le bilan de temps ; 04, 12, 23 réécrites, 03, 22, 25, 29 réécrites en partie ; repères mis à jour sur le SKILL 1.13.0 ; situations 32, 33 et 34 ajoutées ; acquis.md : points inversés ou nouveaux, section du 26/11/2026.
 
 Modifié le 23/11/2026 (décision d'Arthur) : trois passages par situation, notés à la majorité ; points acquis et barrière de sortie ; registre des rejets.
 

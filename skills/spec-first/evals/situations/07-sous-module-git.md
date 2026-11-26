@@ -40,5 +40,5 @@ Que fais-tu ici, étape par étape : combien de runs, lesquels, avec quels argum
 - Présenter les 20 Hz comme faits.
 - Ne rien lancer ce soir en attendant une réponse.
 
-## Repères dans le SKILL 1.7.0
-L99, L112-120, L148, L245, L266-269, L281.
+## Repères dans le SKILL 1.13.0
+L99, L126-130, L139-141, L151, L293, L303-304, L312, L331-334, L351, L76.

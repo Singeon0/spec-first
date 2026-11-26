@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+# spec-first — one command for every test suite, one ledger for every result.
+#
+# Installed as <project>/.spec-first/bin/suite and called from any copy of the project:
+#   suite reset               forget every recorded command (a workflow starts with it: nothing
+#                             of an earlier spec stays in force)
+#   suite set <name>          record the command read on stdin (names: quick, full, heavy:<id>,
+#                             and two settings that only enter the key: setup, subdir)
+#   suite <name> [--rerun]    result of that suite on the tree of the current copy: read from the
+#                             ledger when it is there, joined when it is running, started otherwise
+#   suite wait <key>          wait for a running suite, 280 s at most per call
+#   suite key <name>          print the key only
+#   suite list                every result of the ledger
+#
+# Key = suite name + tree of HEAD + hash of (command, setup, subdir, untracked .env files).
+# The same tree in two copies is one result. A copy with uncommitted changes is refused: its
+# result would be filed under a tree that does not hold them.
+# Exit: 0 pass · 1 fail · 2 still running (call « suite wait <key> ») · 3 refused · 4 lost.
+set -u
+SF="$(cd "$(dirname "$0")/.." && pwd)"
+LEDGER="$SF/ledger"
+CONF="$SF/suites"
+WAIT_MAX="${SUITE_WAIT:-280}"
+
+refuse() { echo "REFUSED $*"; exit 3; }
+safe() { printf '%s' "$1" | tr ':/' '--' | tr -c 'A-Za-z0-9._-' '_'; }
+note() { mkdir -p "$LEDGER"; printf '%s\t%s\t%s\t%s\t%s\n' "$(date +%s)" "$1" "$2" "${3:-}" "${4:-}" >> "$LEDGER/journal.tsv"; }
+field() { tr ' ' '\n' < "$1" | sed -n "s/^$2=//p" | head -1; }
+
+compute() {
+  NAME="$1"
+  case "$NAME" in quick|full|heavy:?*) ;; *) refuse "unknown suite « $NAME » (quick, full, heavy:<id>)";; esac
+  CMDF="$CONF/$(safe "$NAME").cmd"
+  [ -s "$CMDF" ] || refuse "no command recorded for « $NAME »"
+  TOP="$(git rev-parse --show-toplevel 2>/dev/null)" || refuse "not inside a git copy"
+  SUB=""; [ -f "$CONF/subdir.cmd" ] && SUB="$(tr -d '\n' < "$CONF/subdir.cmd")"
+  RUNDIR="$TOP${SUB:+/$SUB}"
+  [ -d "$RUNDIR" ] || refuse "no folder $RUNDIR"
+  TREE="$(git -C "$TOP" rev-parse 'HEAD^{tree}' 2>/dev/null)" || refuse "no commit here"
+  local h
+  h="$({
+    cat "$CMDF"; echo "--setup"; cat "$CONF/setup.cmd" 2>/dev/null; echo "--subdir $SUB"
+    for e in "$TOP"/.env* "$RUNDIR"/.env*; do
+      [ -f "$e" ] || continue
+      git -C "$TOP" ls-files --error-unmatch "$e" >/dev/null 2>&1 && continue
+      echo "--env $(basename "$e") $(git hash-object "$e")"
+    done
+  } | git hash-object --stdin)"
+  KEY="$(safe "$NAME")-$(printf '%s' "$TREE" | cut -c1-12)-$(printf '%s' "$h" | cut -c1-8)"
+}
+
+report() {  # report <key> → prints the verdict, returns 0 pass / 1 fail
+  local r="$LEDGER/$1.result" log="$LEDGER/$1.log" code
+  code="$(field "$r" exit)"
+  if [ "$code" = "0" ]; then
+    echo "PASS key=$1 secs=$(field "$r" secs) log=$log"; tail -n 5 "$log" 2>/dev/null; return 0
+  fi
+  echo "FAIL key=$1 exit=$code secs=$(field "$r" secs) log=$log"; tail -n 40 "$log" 2>/dev/null; return 1
+}
+
+await_key() {  # await_key <key> → 0 pass, 1 fail, 2 still running, 4 lost
+  local key="$1" t0 now pid young
+  t0="$(date +%s)"
+  while :; do
+    if [ -f "$LEDGER/$key.result" ]; then report "$key"; return $?; fi
+    if [ ! -d "$LEDGER/$key.lock" ]; then
+      [ -f "$LEDGER/$key.result" ] && { report "$key"; return $?; }
+      note lost "$key"; echo "LOST key=$key — no result and nothing running: say so, restart only with « suite <name> --rerun »"; return 4
+    fi
+    pid="$(cat "$LEDGER/$key.lock/pid" 2>/dev/null || true)"
+    now="$(date +%s)"
+    if [ -n "$pid" ]; then
+      if ! kill -0 "$pid" 2>/dev/null; then
+        sleep 1
+        [ -f "$LEDGER/$key.result" ] && { report "$key"; return $?; }
+        note lost "$key"; echo "LOST key=$key — its process (pid $pid) is gone without a result; log: $LEDGER/$key.log — say so, restart only with « suite <name> --rerun »"; return 4
+      fi
+    else
+      young="$(cat "$LEDGER/$key.lock/born" 2>/dev/null || echo "$now")"
+      if [ $((now - young)) -gt 30 ]; then note lost "$key"; echo "LOST key=$key — never started; restart only with « suite <name> --rerun »"; return 4; fi
+    fi
+    if [ $((now - t0)) -ge "$WAIT_MAX" ]; then
+      echo "RUNNING key=$key — not finished after ${WAIT_MAX}s here; call again: $0 wait $key"; return 2
+    fi
+    if [ $((now - t0)) -lt 10 ]; then sleep 0.3; else sleep 2; fi
+  done
+}
+
+case "${1:-}" in
+  set)
+    name="${2:-}"
+    case "$name" in quick|full|heavy:?*|setup|subdir) ;; *) refuse "unknown name « $name »";; esac
+    mkdir -p "$CONF"; cat > "$CONF/$(safe "$name").cmd"
+    echo "recorded $name"
+    ;;
+  reset) rm -f "$CONF"/*.cmd 2>/dev/null; echo "reset" ;;
+  key) compute "${2:-}"; echo "$KEY" ;;
+  list)
+    for r in "$LEDGER"/*.result; do [ -f "$r" ] || continue; echo "$(basename "$r" .result) $(cat "$r")"; done
+    ;;
+  wait)
+    [ -n "${2:-}" ] || refuse "usage: suite wait <key>"
+    await_key "$(safe "$2")"; exit $?
+    ;;
+  __run)
+    key="$2"; dir="$3"; cmdf="$4"; log="$LEDGER/$key.log"
+    echo $$ > "$LEDGER/$key.lock/pid"
+    start="$(date +%s)"
+    ( cd "$dir" && bash "$cmdf" ) > "$log" 2>&1 < /dev/null
+    code=$?
+    end="$(date +%s)"
+    echo "EXIT $code" >> "$log"
+    printf 'exit=%s secs=%s start=%s dir=%s\n' "$code" "$((end - start))" "$start" "$dir" > "$LEDGER/$key.result.tmp" && mv "$LEDGER/$key.result.tmp" "$LEDGER/$key.result"
+    note run "$key" "$code" "$((end - start))"
+    rm -rf "$LEDGER/$key.lock"
+    ;;
+  ''|-h|--help) sed -n '2,18p' "$0" ;;
+  *)
+    rerun=""; [ "${2:-}" = "--rerun" ] && rerun=1
+    compute "$1"
+    dirty="$(git -C "$TOP" status --porcelain -- . ':(exclude).spec-first' ':(exclude,glob)**/.env*' 2>/dev/null | head -5)"
+    [ -z "$dirty" ] || refuse "uncommitted changes in $TOP — the result is filed under the committed tree. Your own work: commit it first. Files the setup or a build left there (« ?? » lines that are not source): hide them locally with a line in the file \$(git rev-parse --git-path info/exclude), never by editing .gitignore.
+$dirty"
+    mkdir -p "$LEDGER"
+    if [ -n "$rerun" ] && [ ! -d "$LEDGER/$KEY.lock" ] && [ -f "$LEDGER/$KEY.result" ]; then
+      n=1; while [ -e "$LEDGER/$KEY.result.$n" ]; do n=$((n + 1)); done
+      mv "$LEDGER/$KEY.result" "$LEDGER/$KEY.result.$n"; mv "$LEDGER/$KEY.log" "$LEDGER/$KEY.log.$n" 2>/dev/null
+    fi
+    if [ -f "$LEDGER/$KEY.result" ]; then note read "$KEY" "$(field "$LEDGER/$KEY.result" exit)"; report "$KEY"; exit $?; fi
+    if [ -n "$rerun" ] && [ -d "$LEDGER/$KEY.lock" ]; then
+      pid="$(cat "$LEDGER/$KEY.lock/pid" 2>/dev/null || true)"
+      if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then rm -rf "$LEDGER/$KEY.lock"; fi
+    fi
+    if mkdir "$LEDGER/$KEY.lock" 2>/dev/null; then
+      date +%s > "$LEDGER/$KEY.lock/born"
+      echo "STARTED key=$KEY in $RUNDIR"
+      nohup bash "$0" __run "$KEY" "$RUNDIR" "$CMDF" > /dev/null 2>&1 < /dev/null &
+    else
+      note join "$KEY"; echo "JOINED key=$KEY (already running)"
+    fi
+    await_key "$KEY"; exit $?
+    ;;
+esac
